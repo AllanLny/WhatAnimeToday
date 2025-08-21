@@ -1,0 +1,30 @@
+@import '../../../variables.scss';
+
+.platform-logo {
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  
+  &.small {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+  
+  &.medium {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+  
+  &.large {
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
+  }
+}

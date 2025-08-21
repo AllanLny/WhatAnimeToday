@@ -3,7 +3,7 @@ import { UserProvider } from './context/UserContext';
 import Home from './pages/Home/Home';
 import WeeklyCalendar from './pages/Calendar/WeeklyCalendar';
 import Settings from './pages/Settings/Settings';
-import './App.css';
+import './App.scss';
 
 function App() {
   return (
@@ -30,7 +30,7 @@ function App() {
           </main>
 
           <footer className="app-footer">
-            <p>© 2024 What Anime Today | Toutes les données proviennent de Jikan API</p>
+            <p>© 2024 What Anime Today | Toutes les données proviennent de TMDB API</p>
           </footer>
         </div>
       </Router>

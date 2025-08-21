@@ -1,0 +1,220 @@
+@import '../../variables.scss';
+
+.weekly-calendar {
+  h1 {
+    background: linear-gradient(to right, $color-secondary, $color-accent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-block;
+    margin-bottom: $spacing-sm;
+    font-size: 2.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  
+  .country-indicator {
+    margin-bottom: $spacing-md;
+    color: $color-text-secondary;
+    
+    span {
+      font-weight: 600;
+      color: $color-text-primary;
+      border-bottom: 2px solid $color-secondary;
+      padding-bottom: 2px;
+    }
+  }
+}
+
+.platform-filter {
+  margin: $spacing-md 0 $spacing-lg;
+  
+  span {
+    display: block;
+    margin-bottom: $spacing-sm;
+    color: $color-text-secondary;
+    font-size: 0.9rem;
+  }
+  
+  .filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-xs;
+    justify-content: center;
+    
+    button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: $color-bg-card;
+      color: $color-text-secondary;
+      border: 2px solid transparent;
+      margin: 0;
+      font-size: 0.9rem;
+      padding: 0.5rem 1rem;
+      transition: all $transition-speed;
+      
+      &:hover {
+        background-color: lighten($color-bg-card, 5%);
+        transform: translateY(-2px);
+      }
+      
+      &.active {
+        border-color: $color-secondary;
+        color: $color-text-primary;
+        background-color: rgba($color-secondary, 0.1);
+      }
+    }
+  }
+}
+
+.calendar-grid {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: $spacing-md;
+  padding: $spacing-sm 0 $spacing-lg;
+  margin: $spacing-md (-$spacing-sm);
+  
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background-color: rgba($color-bg-hover, 0.3);
+    border-radius: 10px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: $color-secondary;
+    border-radius: 10px;
+    
+    &:hover {
+      background: lighten($color-secondary, 10%);
+    }
+  }
+}
+
+.day-column {
+  flex: 0 0 300px;
+  min-width: 300px;
+  background-color: $color-bg-card;
+  border-radius: $border-radius-lg;
+  padding: $spacing-md;
+  box-shadow: $box-shadow;
+  position: relative;
+  overflow: hidden;
+  
+  &.current-day {
+    border: 2px solid $color-primary;
+    
+    &::before {
+      content: "Aujourd'hui";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: $color-primary;
+      color: white;
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      border-radius: $border-radius-sm;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    
+    h2 {
+      color: $color-primary;
+    }
+  }
+  
+  h2 {
+    padding-bottom: $spacing-sm;
+    margin-bottom: $spacing-md;
+    border-bottom: 2px solid rgba($color-secondary, 0.3);
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+}
+
+.anime-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  max-height: 600px;
+  overflow-y: auto;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background-color: rgba($color-bg-hover, 0.3);
+    border-radius: 10px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: $color-secondary;
+    border-radius: 10px;
+  }
+  
+  .no-anime-message {
+    color: $color-text-muted;
+    font-style: italic;
+    text-align: center;
+    padding: $spacing-md 0;
+  }
+}
+
+.calendar-anime-card {
+  display: flex;
+  align-items: center;
+  background-color: rgba($color-bg-hover, 0.5);
+  border-radius: $border-radius-md;
+  padding: $spacing-xs;
+  transition: transform $transition-speed $transition-timing, background-color 0.2s ease;
+  cursor: pointer;
+  
+  &:hover {
+    transform: translateY(-3px);
+    background-color: rgba($color-bg-hover, 0.8);
+  }
+  
+  .calendar-anime-image {
+    width: 60px;
+    height: 80px;
+    border-radius: $border-radius-sm;
+    object-fit: cover;
+    border: 2px solid $color-secondary;
+    flex-shrink: 0;
+  }
+  
+  .calendar-anime-info {
+    margin-left: $spacing-sm;
+    text-align: left;
+    flex: 1;
+    
+    h3 {
+      font-size: 1rem;
+      margin: 0 0 $spacing-xs;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      font-weight: 600;
+    }
+    
+    p {
+      font-size: 0.8rem;
+      color: $color-text-muted;
+      margin: 0 0 $spacing-xs;
+    }
+    
+    .available-platforms {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+  }
+}

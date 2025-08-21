@@ -1,0 +1,192 @@
+@import '../../variables.scss';
+
+.home-container {
+  h1 {
+    background: linear-gradient(to right, $color-primary, $color-accent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-block;
+    margin-bottom: $spacing-sm;
+    font-size: 2.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    color: $color-text-secondary;
+    margin-bottom: $spacing-md;
+    font-weight: 500;
+  }
+  
+  .country-indicator {
+    margin-bottom: $spacing-md;
+    color: $color-text-secondary;
+    
+    span {
+      font-weight: 600;
+      color: $color-text-primary;
+      border-bottom: 2px solid $color-primary;
+      padding-bottom: 2px;
+    }
+  }
+}
+
+.platform-filter {
+  margin: $spacing-md 0 $spacing-lg;
+  
+  span {
+    display: block;
+    margin-bottom: $spacing-sm;
+    color: $color-text-secondary;
+    font-size: 0.9rem;
+  }
+  
+  .filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-xs;
+    justify-content: center;
+    
+    button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: $color-bg-card;
+      color: $color-text-secondary;
+      border: 2px solid transparent;
+      margin: 0;
+      font-size: 0.9rem;
+      padding: 0.5rem 1rem;
+      transition: all $transition-speed;
+      
+      &:hover {
+        background-color: lighten($color-bg-card, 5%);
+        transform: translateY(-2px);
+      }
+      
+      &.active {
+        border-color: $color-primary;
+        color: $color-text-primary;
+        background-color: rgba($color-primary, 0.1);
+      }
+    }
+  }
+}
+
+.no-results {
+  margin: $spacing-xl 0;
+  padding: $spacing-lg;
+  background-color: $color-bg-card;
+  border-radius: $border-radius-lg;
+  color: $color-text-secondary;
+  font-weight: 500;
+}
+
+.anime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: $spacing-lg;
+  margin-top: $spacing-lg;
+}
+
+.anime-card {
+  background-color: $color-bg-card;
+  border-radius: $border-radius-lg;
+  overflow: hidden;
+  transition: transform $transition-speed $transition-timing,
+              box-shadow $transition-speed $transition-timing;
+  box-shadow: $box-shadow;
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: $box-shadow-hover;
+    
+    .anime-platforms {
+      opacity: 1;
+    }
+  }
+  
+  .anime-image-container {
+    position: relative;
+    width: 100%;
+    height: 200px;
+    
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-bottom: 2px solid $color-primary;
+    }
+    
+    .anime-platforms {
+      position: absolute;
+      top: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px;
+      opacity: 0.9;
+      transition: opacity 0.2s ease;
+      
+      .platform-logo-wrapper {
+        cursor: pointer;
+        transition: transform 0.2s ease;
+        
+        &:hover {
+          transform: scale(1.1);
+        }
+      }
+    }
+  }
+  
+  h3 {
+    padding: $spacing-sm $spacing-sm 0;
+    font-size: 1.3rem;
+    margin: 0;
+    color: $color-text-primary;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  
+  .anime-synopsis {
+    padding: $spacing-xs $spacing-sm;
+    color: $color-text-secondary;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin: 0;
+    flex: 1;
+    font-weight: 400;
+    text-align: left;
+  }
+  
+  .watch-button-container {
+    padding: $spacing-sm;
+    
+    .watch-button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(to right, $color-primary, darken($color-primary, 10%));
+      font-weight: 600;
+      text-transform: capitalize;
+      
+      .watch-icon {
+        font-size: 0.8rem;
+      }
+    }
+  }
+}

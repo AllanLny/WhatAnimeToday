@@ -1,0 +1,93 @@
+@import '../../variables.scss';
+
+.settings-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: $spacing-lg;
+  
+  h1 {
+    background: linear-gradient(to right, $color-accent, $color-secondary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+    margin-bottom: $spacing-xl;
+  }
+}
+
+.settings-form {
+  background-color: $color-bg-card;
+  padding: $spacing-lg;
+  border-radius: $border-radius-lg;
+  box-shadow: $box-shadow;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: $spacing-lg;
+  
+  label {
+    text-align: left;
+    margin-bottom: $spacing-sm;
+    font-weight: 500;
+    color: $color-text-primary;
+  }
+}
+
+.country-select {
+  padding: $spacing-sm;
+  border-radius: $border-radius-md;
+  border: 2px solid $color-bg-hover;
+  background-color: $color-bg-dark;
+  color: $color-text-primary;
+  font-size: 1rem;
+  transition: border-color $transition-speed;
+  outline: none;
+  appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+  
+  &:focus {
+    border-color: $color-secondary;
+    box-shadow: 0 0 0 2px rgba($color-secondary, 0.25);
+  }
+  
+  option {
+    background-color: $color-bg-dark;
+    color: $color-text-primary;
+  }
+}
+
+.settings-info {
+  text-align: left;
+  background-color: rgba($color-secondary, 0.1);
+  padding: $spacing-md;
+  border-left: 4px solid $color-secondary;
+  border-radius: $border-radius-sm;
+  font-size: 0.9rem;
+  color: $color-text-secondary;
+  margin: $spacing-md 0;
+}
+
+.save-button {
+  background: linear-gradient(to right, $color-primary, $color-secondary);
+  color: white;
+  padding: $spacing-sm $spacing-xl;
+  border: none;
+  margin-top: $spacing-md;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: all $transition-speed;
+  
+  &:hover {
+    background: linear-gradient(to right, darken($color-primary, 5%), darken($color-secondary, 5%));
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+}
