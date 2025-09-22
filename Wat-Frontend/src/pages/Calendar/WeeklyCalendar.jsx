@@ -1,74 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useUserContext } from '../../context/UserContext';
-import { getStreamingInfo, getWeeklyReleases } from '../../services/api';
+import { useWeeklyReleases } from '../../services/api';
 import PlatformLogo from '../../components/Common/PlatformLogo/PlatformLogo';
 import './WeeklyCalendar.scss';
 
 function WeeklyCalendar() {
-  const [weeklySchedule, setWeeklySchedule] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [selectedPlatform, setSelectedPlatform] = useState('all');
   const { country } = useUserContext();
   
-  useEffect(() => {
-    const fetchWeeklySchedule = async () => {
-      try {
-        setLoading(true);
-        
-        // Récupérer les données pour la semaine en utilisant notre nouvelle fonction TMDB
-        const weeklyData = await getWeeklyReleases();
-        
-        if (!weeklyData) {
-          throw new Error("Aucune donnée retournée par l'API");
-        }
-        
-        // Traiter les données pour ajouter les informations de streaming
-        const processedData = {};
-        
-        for (const day of Object.keys(weeklyData)) {
-          // Création d'un tableau pour stocker les animes avec les informations de streaming
-          const animesWithStreaming = [];
-          
-          // Limiter à 10 animes par jour pour éviter trop de requêtes API
-          const limitedAnimes = weeklyData[day].slice(0, 10);
-          
-          for (let i = 0; i < limitedAnimes.length; i++) {
-            const anime = limitedAnimes[i];
-            try {
-              // Récupérer les informations de streaming pour cet anime
-              const streamingInfo = await getStreamingInfo(anime.mal_id, country);
-              
-              // Ajouter l'anime avec les informations de streaming et un identifiant unique
-              animesWithStreaming.push({
-                ...anime,
-                streamingInfo,
-                occurrenceId: `${anime.mal_id}_${i}_${day}`
-              });
-            } catch (err) {
-              console.error(`Erreur lors de la récupération des infos de streaming pour ${anime.title}:`, err);
-              // Continuer avec les autres animes même si un échoue
-            }
-          }
-          
-          processedData[day] = animesWithStreaming;
-        }
-        
-        setWeeklySchedule(processedData);
-        setError(null);
-      } catch (err) {
-        setError("Erreur lors de la récupération du calendrier. Veuillez réessayer plus tard.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Utilisation du hook TanStack Query pour récupérer le calendrier hebdomadaire
+  const { 
+    data: weeklyData,
+    isLoading,
+    isError,
+    error
+  } = useWeeklyReleases();
+  
+  // Construction du calendrier avec les informations de streaming
+  // Avec TanStack Query, les données de streaming sont déjà incluses
+  
+  if (isLoading) return <div className="loading-spinner">Chargement du calendrier...</div>;
+  if (isError) return <div className="error-message">{error?.message || "Erreur lors de la récupération du calendrier. Veuillez réessayer plus tard."}</div>;
 
-    fetchWeeklySchedule();
-  }, [country]);
-
-  if (loading) return <div className="loading-spinner">Chargement du calendrier...</div>;
-  if (error) return <div className="error-message">{error}</div>;
+  // Les données sont disponibles
+  const weeklySchedule = weeklyData || {
+    sunday: [],
+    monday: [],
+    tuesday: [],
+    wednesday: [],
+    thursday: [],
+    friday: [],
+    saturday: []
+  };
 
   // Jours de la semaine en français
   const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -81,7 +44,7 @@ function WeeklyCalendar() {
   const handleAnimeClick = (anime) => {
     // Déterminer la plateforme préférée parmi celles disponibles
     const availablePlatforms = Object.entries(anime.streamingInfo || {})
-      .filter(([_, info]) => info.available)
+      .filter(([, info]) => info.available)
       .map(([platform]) => platform);
     
     if (availablePlatforms.length === 0) return;
@@ -92,8 +55,8 @@ function WeeklyCalendar() {
       return;
     }
     
-    // Ordre de préférence: la plateforme sélectionnée, puis Crunchyroll, Netflix, ADN, Prime Video
-    const priorityOrder = ['crunchyroll', 'netflix', 'adn', 'prime video'];
+    // Ordre de préférence: la plateforme sélectionnée, puis Crunchyroll, Netflix, ADN, Prime Video, Disney+
+    const priorityOrder = ['crunchyroll', 'netflix', 'adn', 'prime video', 'disney plus'];
     
     // Trouver la première plateforme disponible selon l'ordre de priorité
     const platformToUse = priorityOrder.find(p => availablePlatforms.includes(p)) || availablePlatforms[0];
@@ -153,6 +116,13 @@ function WeeklyCalendar() {
           >
             <PlatformLogo platform="prime video" size="small" /> Prime Video
           </button>
+          
+          <button 
+            className={selectedPlatform === 'disney plus' ? 'active' : ''} 
+            onClick={() => setSelectedPlatform('disney plus')}
+          >
+            <PlatformLogo platform="disney plus" size="small" /> Disney+
+          </button>
         </div>
       </div>
       
@@ -170,7 +140,7 @@ function WeeklyCalendar() {
               <div className="anime-list">
                 {dayAnimes && dayAnimes.length > 0 ? dayAnimes.map(anime => (
                   <div 
-                    key={anime.occurrenceId} 
+                    key={anime.occurrenceId || anime.mal_id} 
                     className="calendar-anime-card"
                     onClick={() => handleAnimeClick(anime)}
                   >
@@ -184,7 +154,7 @@ function WeeklyCalendar() {
                       <p>Épisode: {anime.broadcast?.string || 'Horaire non précisé'}</p>
                       <div className="available-platforms">
                         {Object.entries(anime.streamingInfo || {})
-                          .filter(([_, info]) => info.available)
+                          .filter(([, info]) => info.available)
                           .map(([platform]) => (
                             <PlatformLogo key={platform} platform={platform} size="small" />
                           ))

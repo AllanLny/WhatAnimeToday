@@ -1,45 +1,29 @@
-import { useState, useEffect } from 'react';
-import { getTodayReleases, getStreamingInfo } from '../../services/api';
+import { useState } from 'react';
+import { useTodayReleases } from '../../services/api';
 import { useUserContext } from '../../context/UserContext';
 import PlatformLogo from '../../components/Common/PlatformLogo/PlatformLogo';
 import './Home.scss'; 
 
 function Home() {
-  const [todayReleases, setTodayReleases] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const { country } = useUserContext();
   const [selectedPlatform, setSelectedPlatform] = useState('all'); // 'all' ou nom de la plateforme
+  
+  // Utilisation du hook TanStack Query pour récupérer les sorties du jour
+  const { 
+    data: todayReleasesData,
+    isLoading,
+    isError,
+    error
+  } = useTodayReleases();
+  
+  // Traitement des données pour ajouter les informations de streaming
+  // Ce travail est désormais géré directement par le hook useTodayReleases
 
-  useEffect(() => {
-    const fetchTodayReleases = async () => {
-      try {
-        setLoading(true);
-        const releases = await getTodayReleases();
-        
-        // Pour chaque anime, on récupère ses plateformes de diffusion avec le pays sélectionné
-        const releasesWithStreaming = await Promise.all(
-          releases.map(async (anime) => {
-            const streamingInfo = await getStreamingInfo(anime.mal_id, country);
-            return { ...anime, streamingInfo };
-          })
-        );
-        
-        setTodayReleases(releasesWithStreaming);
-        setError(null);
-      } catch (err) {
-        setError("Erreur lors de la récupération des données. Veuillez réessayer plus tard.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  if (isLoading) return <div className="loading-spinner">Chargement...</div>;
+  if (isError) return <div className="error-message">{error?.message || "Erreur lors de la récupération des données. Veuillez réessayer plus tard."}</div>;
 
-    fetchTodayReleases();
-  }, [country]); // Refetch when country changes
-
-  if (loading) return <div className="loading-spinner">Chargement...</div>;
-  if (error) return <div className="error-message">{error}</div>;
+  // Les données sont disponibles
+  const todayReleases = todayReleasesData || [];
 
   const today = new Date();
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -106,6 +90,13 @@ function Home() {
           >
             <PlatformLogo platform="prime video" size="small" /> Prime Video
           </button>
+          
+          <button 
+            className={selectedPlatform === 'disney plus' ? 'active' : ''} 
+            onClick={() => handlePlatformClick('disney plus')}
+          >
+            <PlatformLogo platform="disney plus" size="small" /> Disney+
+          </button>
         </div>
       </div>
       
@@ -119,7 +110,7 @@ function Home() {
                 <img src={anime.images.jpg.image_url} alt={anime.title} />
                 <div className="anime-platforms">
                   {Object.entries(anime.streamingInfo)
-                    .filter(([_, info]) => info.available)
+                    .filter(([, info]) => info.available)
                     .map(([platform]) => (
                       <div 
                         key={platform} 
@@ -138,9 +129,9 @@ function Home() {
               </p>
               <div className="watch-button-container">
                 {Object.entries(anime.streamingInfo)
-                  .filter(([_, info]) => info.available)
+                  .filter(([, info]) => info.available)
                   .slice(0, 1)
-                  .map(([platform, info]) => (
+                  .map(([platform]) => (
                     <button 
                       key={platform} 
                       className="watch-button"

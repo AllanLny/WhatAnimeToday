@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
+import { useUserContext } from '../context/UserContext';
+
 // Utilisation des variables d'environnement TMDB uniquement
 const API_URL = import.meta.env.VITE_TMDB_API_URL || 'https://api.themoviedb.org/3';
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY || '';
@@ -5,6 +8,95 @@ const API_KEY = import.meta.env.VITE_TMDB_API_KEY || '';
 // Fonction auxiliaire pour ajouter la clé API aux URLs
 function addApiKey(url) {
   return `${url}${url.includes('?') ? '&' : '?'}api_key=${API_KEY}`;
+}
+
+// Hooks pour TanStack Query
+// ========================
+
+// Hook pour les animes saisonniers
+export const useSeasonalAnime = (season, year) => {
+  return useQuery({
+    queryKey: ['seasonalAnime', season, year],
+    queryFn: () => getSeasonalAnime(season, year),
+  });
+};
+
+// Hook pour les sorties du jour avec streaming info
+export const useTodayReleases = () => {
+  const { country } = useUserContext?.() || { country: 'France' };
+  
+  return useQuery({
+    queryKey: ['todayReleases', country],
+    queryFn: async () => {
+      // Récupérer les sorties du jour
+      const releases = await getTodayReleases();
+      
+      // Pour chaque anime, récupérer ses plateformes de diffusion
+      const releasesWithStreaming = await Promise.all(
+        releases.map(async (anime) => {
+          const streamingInfo = await getStreamingInfo(anime.mal_id, country);
+          return { ...anime, streamingInfo };
+        })
+      );
+      
+      return releasesWithStreaming;
+    },
+  });
+};
+
+// Hook pour le calendrier hebdomadaire avec streaming info
+export const useWeeklyReleases = () => {
+  const { country } = useUserContext?.() || { country: 'France' };
+  
+  return useQuery({
+    queryKey: ['weeklyReleases', country],
+    queryFn: async () => {
+      // Récupérer les données brutes du calendrier
+      const weeklyData = await getWeeklyReleases();
+      
+      // Traiter chaque jour pour ajouter les informations de streaming
+      const processedData = {};
+      
+      for (const day of Object.keys(weeklyData)) {
+        // Limiter à 10 animes par jour pour éviter trop de requêtes API
+        const limitedAnimes = weeklyData[day].slice(0, 10);
+        const animesWithStreaming = [];
+        
+        // Récupérer les infos de streaming pour chaque anime
+        for (let i = 0; i < limitedAnimes.length; i++) {
+          const anime = limitedAnimes[i];
+          try {
+            const streamingInfo = await getStreamingInfo(anime.mal_id, country);
+            animesWithStreaming.push({
+              ...anime,
+              streamingInfo,
+              occurrenceId: `${anime.mal_id}_${i}_${day}`
+            });
+          } catch (err) {
+            console.error(`Erreur streaming info pour ${anime.title}:`, err);
+            // Continuer avec les autres animes même si un échoue
+            animesWithStreaming.push({
+              ...anime,
+              streamingInfo: {},
+              occurrenceId: `${anime.mal_id}_${i}_${day}`
+            });
+          }
+        }
+        
+        processedData[day] = animesWithStreaming;
+      }
+      
+      return processedData;
+    },
+  });
+};
+
+// Hook pour les informations de streaming
+export const useStreamingInfo = (animeId, country = 'France') => {
+  return useQuery({
+    queryKey: ['streamingInfo', animeId, country],
+    queryFn: () => getStreamingInfo(animeId, country),
+  });
 }
 
 // Récupérer les anime en cours avec filtre par saison
@@ -348,5 +440,9 @@ export default {
   getSeasonalAnime,
   getTodayReleases,
   getWeeklyReleases,
-  getStreamingInfo
+  getStreamingInfo,
+  useSeasonalAnime,
+  useTodayReleases,
+  useWeeklyReleases,
+  useStreamingInfo
 };
