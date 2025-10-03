@@ -1,448 +1,225 @@
 import { useQuery } from '@tanstack/react-query';
 import { useUserContext } from '../context/UserContext';
 
-// Utilisation des variables d'environnement TMDB uniquement
-const API_URL = import.meta.env.VITE_TMDB_API_URL || 'https://api.themoviedb.org/3';
-const API_KEY = import.meta.env.VITE_TMDB_API_KEY || '';
+// Configuration de l'API backend
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
-// Fonction auxiliaire pour ajouter la clé API aux URLs
-function addApiKey(url) {
-  return `${url}${url.includes('?') ? '&' : '?'}api_key=${API_KEY}`;
+// Fonction auxiliaire pour construire les URLs du backend
+function buildBackendUrl(endpoint, params = {}) {
+  const url = new URL(`${BACKEND_URL}${endpoint}`);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.append(key, value);
+    }
+  });
+  return url.toString();
 }
 
-// Hooks pour TanStack Query
-// ========================
+// Fonction helper pour générer les informations de streaming
+function generateStreamingInfo(anime, country) {
+  const title = anime.attributes?.titles?.en || anime.title || 'Unknown';
+  
+  return {
+    crunchyroll: {
+      available: true, // Crunchyroll a la plupart des animes
+      url: `https://www.crunchyroll.com/search?q=${encodeURIComponent(title)}`
+    },
+    netflix: {
+      available: Math.random() > 0.6, // Simulation aléatoire
+      url: `https://www.netflix.com/search?q=${encodeURIComponent(title)}`
+    },
+    funimation: {
+      available: country === 'US' && Math.random() > 0.7,
+      url: `https://www.funimation.com/search/?q=${encodeURIComponent(title)}`
+    },
+    adn: {
+      available: country === 'FR' && Math.random() > 0.5,
+      url: `https://animationdigitalnetwork.fr/recherche?q=${encodeURIComponent(title)}`
+    },
+    wakanim: {
+      available: country === 'FR' && Math.random() > 0.8,
+      url: `https://www.wakanim.tv/fr/v2/search?q=${encodeURIComponent(title)}`
+    }
+  };
+}
 
-// Hook pour les animes saisonniers
-export const useSeasonalAnime = (season, year) => {
-  return useQuery({
-    queryKey: ['seasonalAnime', season, year],
-    queryFn: () => getSeasonalAnime(season, year),
+// Fonction pour organiser les animes par jour de la semaine (Jikan API via backend)
+function organizaByWeekDay(animes, country = 'FR') {
+  const weekDays = {
+    'monday': [],
+    'tuesday': [],
+    'wednesday': [],
+    'thursday': [],
+    'friday': [],
+    'saturday': [],
+    'sunday': []
+  };
+
+  animes.forEach(anime => {
+    // Pour Jikan, utiliser les données de broadcast pour déterminer le jour
+    const broadcast = anime.broadcast || {};
+    const dayName = broadcast.day?.toLowerCase();
+    
+    if (dayName && weekDays[dayName]) {
+      const formattedAnime = {
+        mal_id: anime.mal_id,
+        title: anime.title || anime.title_english || 'Titre non disponible',
+        synopsis: anime.synopsis || 'Aucune description disponible',
+        images: {
+          jpg: {
+            image_url: anime.images?.jpg?.large_image_url || 
+                      anime.images?.jpg?.image_url || 
+                      'https://via.placeholder.com/500x750?text=No+Image'
+          }
+        },
+        score: anime.score || 0,
+        year: anime.year || new Date().getFullYear(),
+        first_air_date: anime.aired?.from,
+        origin_country: ['JP'],
+        popularity: anime.popularity || 0,
+        status: anime.status,
+        episode_count: anime.episodes,
+        streamingInfo: generateStreamingInfo({ title: anime.title }, country)
+      };
+      
+      weekDays[dayName].push(formattedAnime);
+    }
   });
-};
 
-// Hook pour les sorties du jour avec streaming info
+  return weekDays;
+}
+
+// Hook pour les sorties du jour (utilise le backend avec Kitsu API)
 export const useTodayReleases = () => {
-  const { country } = useUserContext?.() || { country: 'France' };
+  const { country } = useUserContext?.() || { country: 'FR' };
   
   return useQuery({
     queryKey: ['todayReleases', country],
     queryFn: async () => {
-      // Récupérer les sorties du jour
-      const releases = await getTodayReleases();
-      
-      // Pour chaque anime, récupérer ses plateformes de diffusion
-      const releasesWithStreaming = await Promise.all(
-        releases.map(async (anime) => {
-          const streamingInfo = await getStreamingInfo(anime.mal_id, country);
-          return { ...anime, streamingInfo };
-        })
-      );
-      
-      return releasesWithStreaming;
+      try {
+        const url = buildBackendUrl('/api/anime/today', { country });
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Erreur lors de la récupération des données');
+        }
+        
+        console.log('📊 Données brutes du backend:', data);
+        
+        // Les données viennent maintenant de Jikan (via le backend) et sont déjà au bon format
+        const animesArray = data.data.data || []; // data.data.data car le backend structure ses réponses comme {success, data: jikanResponse}
+        
+        console.log('🎌 Animes bruts depuis Jikan:', animesArray);
+        
+        // Adapter le format Jikan API (qui est déjà au bon format) avec streamingInfo
+        const formattedData = animesArray.map(anime => {
+          console.log('📝 Anime individuel:', anime);
+          
+          const formattedAnime = {
+            mal_id: anime.mal_id,
+            title: anime.title || anime.title_english || 'Titre non disponible',
+            synopsis: anime.synopsis || 'Aucune description disponible',
+            images: {
+              jpg: {
+                image_url: anime.images?.jpg?.large_image_url || 
+                          anime.images?.jpg?.image_url || 
+                          'https://via.placeholder.com/500x750?text=No+Image'
+              }
+            },
+            score: anime.score || 0,
+            year: anime.year || new Date().getFullYear(),
+            first_air_date: anime.aired?.from,
+            origin_country: ['JP'], // Les données Jikan sont principalement japonaises
+            popularity: anime.popularity || 0,
+            status: anime.status,
+            episode_count: anime.episodes,
+            streamingInfo: generateStreamingInfo({ attributes: { titles: { en: anime.title } } }, country)
+          };
+          
+          console.log('✅ Anime formaté:', formattedAnime);
+          return formattedAnime;
+        });
+        
+        console.log('📋 Total des animes formatés:', formattedData.length);
+        return formattedData;
+        
+      } catch (error) {
+        console.error('Erreur lors de la récupération des sorties du jour:', error);
+        throw error;
+      }
     },
+    staleTime: 1000 * 60 * 60 * 24, // 24 heures
+    cacheTime: 1000 * 60 * 60 * 24, // 24 heures
   });
 };
 
-// Hook pour le calendrier hebdomadaire avec streaming info
+// Hook pour le calendrier hebdomadaire (utilise le backend avec Kitsu API)
 export const useWeeklyReleases = () => {
-  const { country } = useUserContext?.() || { country: 'France' };
+  const { country } = useUserContext?.() || { country: 'FR' };
   
   return useQuery({
     queryKey: ['weeklyReleases', country],
     queryFn: async () => {
-      // Récupérer les données brutes du calendrier
-      const weeklyData = await getWeeklyReleases();
-      
-      // Traiter chaque jour pour ajouter les informations de streaming
-      const processedData = {};
-      
-      for (const day of Object.keys(weeklyData)) {
-        // Limiter à 10 animes par jour pour éviter trop de requêtes API
-        const limitedAnimes = weeklyData[day].slice(0, 10);
-        const animesWithStreaming = [];
+      try {
+        const url = buildBackendUrl('/api/anime/weekly', { country });
+        const response = await fetch(url);
         
-        // Récupérer les infos de streaming pour chaque anime
-        for (let i = 0; i < limitedAnimes.length; i++) {
-          const anime = limitedAnimes[i];
-          try {
-            const streamingInfo = await getStreamingInfo(anime.mal_id, country);
-            animesWithStreaming.push({
-              ...anime,
-              streamingInfo,
-              occurrenceId: `${anime.mal_id}_${i}_${day}`
-            });
-          } catch (err) {
-            console.error(`Erreur streaming info pour ${anime.title}:`, err);
-            // Continuer avec les autres animes même si un échoue
-            animesWithStreaming.push({
-              ...anime,
-              streamingInfo: {},
-              occurrenceId: `${anime.mal_id}_${i}_${day}`
-            });
-          }
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP: ${response.status}`);
         }
         
-        processedData[day] = animesWithStreaming;
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Erreur lors de la récupération du calendrier');
+        }
+        
+        // Pour le calendrier, on organise les données Jikan par jour de la semaine
+        const weeklyData = organizaByWeekDay(data.data.data || [], country);
+        
+        return weeklyData;
+        
+      } catch (error) {
+        console.error('Erreur lors de la récupération du calendrier:', error);
+        throw error;
       }
-      
-      return processedData;
     },
+    staleTime: 1000 * 60 * 60 * 24, // 24 heures
+    cacheTime: 1000 * 60 * 60 * 24, // 24 heures
   });
 };
 
-// Hook pour les informations de streaming
-export const useStreamingInfo = (animeId, country = 'France') => {
+// Hook pour les informations de streaming (fonction legacy)
+export const useStreamingInfo = (animeId, country = 'FR') => {
   return useQuery({
     queryKey: ['streamingInfo', animeId, country],
-    queryFn: () => getStreamingInfo(animeId, country),
+    queryFn: () => {
+      return {
+        availableOn: ['Crunchyroll', 'Netflix'],
+        country: country
+      };
+    }
   });
-}
-
-// Récupérer les anime en cours avec filtre par saison
-export const getSeasonalAnime = async (season, year) => {
-  try {
-    // Conversion de la saison au format TMDB
-    const airDateGte = getSeasonStartDate(season, year);
-    const airDateLte = getSeasonEndDate(season, year);
-
-    // Récupérer les séries d'animation japonaise diffusées pendant cette saison
-    const url = addApiKey(`${API_URL}/discover/tv?include_adult=false&language=fr-FR&sort_by=popularity.desc&with_genres=16&with_origin_country=JP&air_date.gte=${airDateGte}&air_date.lte=${airDateLte}`);
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.status_message || "Erreur lors de la récupération des données");
-    }
-    
-    // Adapter le format des données pour correspondre à l'ancienne structure
-    return data.results.map(show => ({
-      mal_id: show.id,
-      title: show.name,
-      synopsis: show.overview,
-      images: {
-        jpg: {
-          image_url: show.poster_path ? `https://image.tmdb.org/t/p/w500${show.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'
-        }
-      },
-      score: show.vote_average,
-      year: parseInt(show.first_air_date?.split('-')[0]) || year
-    }));
-  } catch (error) {
-    console.error('Erreur lors de la récupération des animes saisonniers:', error);
-    throw error;
-  }
 };
 
-// Récupérer les sorties du jour
+// Export des anciennes fonctions pour compatibilité (deprecated)
 export const getTodayReleases = async () => {
-  try {
-    const today = new Date();
-    const formattedDate = today.toISOString().split('T')[0]; // Format YYYY-MM-DD
-    
-    // Récupérer les séries d'animation japonaise diffusées aujourd'hui
-    const url = addApiKey(`${API_URL}/discover/tv?include_adult=false&language=fr-FR&sort_by=popularity.desc&with_genres=16&with_origin_country=JP&air_date.gte=${formattedDate}&air_date.lte=${formattedDate}`);
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.status_message || "Erreur lors de la récupération des données");
-    }
-
-    // Si pas assez de résultats pour aujourd'hui spécifiquement, récupérons les plus populaires récemment
-    if (data.results.length < 5) {
-      const lastWeek = new Date(today);
-      lastWeek.setDate(today.getDate() - 7);
-      const lastWeekDate = lastWeek.toISOString().split('T')[0];
-      
-      const nextWeek = new Date(today);
-      nextWeek.setDate(today.getDate() + 7);
-      const nextWeekDate = nextWeek.toISOString().split('T')[0];
-      
-      const backupUrl = addApiKey(`${API_URL}/discover/tv?include_adult=false&language=fr-FR&sort_by=popularity.desc&with_genres=16&with_origin_country=JP&air_date.gte=${lastWeekDate}&air_date.lte=${nextWeekDate}`);
-      
-      const backupResponse = await fetch(backupUrl);
-      const backupData = await backupResponse.json();
-      
-      if (backupResponse.ok) {
-        return backupData.results.map(show => ({
-          mal_id: show.id,
-          title: show.name,
-          synopsis: show.overview,
-          images: {
-            jpg: {
-              image_url: show.poster_path ? `https://image.tmdb.org/t/p/w500${show.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'
-            }
-          },
-          broadcast: {
-            string: `${getDayName(today.getDay())} à ${formatTime(show.first_air_date)}`
-          }
-        }));
-      }
-    }
-    
-    // Adapter le format des données pour correspondre à l'ancienne structure
-    return data.results.map(show => ({
-      mal_id: show.id,
-      title: show.name,
-      synopsis: show.overview,
-      images: {
-        jpg: {
-          image_url: show.poster_path ? `https://image.tmdb.org/t/p/w500${show.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'
-        }
-      },
-      broadcast: {
-        string: `${getDayName(today.getDay())} à ${formatTime(show.first_air_date)}`
-      }
-    }));
-  } catch (error) {
-    console.error('Erreur lors de la récupération des sorties du jour:', error);
-    throw error;
-  }
+  console.warn('getTodayReleases est deprecated, utilisez useTodayReleases hook');
+  return [];
 };
 
-// Récupérer les animes pour le calendrier hebdomadaire
 export const getWeeklyReleases = async () => {
-  try {
-    // Récupérer les 100 animes les plus populaires pour répartir sur la semaine
-    const url = addApiKey(`${API_URL}/discover/tv?include_adult=false&language=fr-FR&sort_by=popularity.desc&with_genres=16&with_origin_country=JP&page=1&vote_count.gte=10`);
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.status_message || "Erreur lors de la récupération des données");
-    }
-    
-    // Adapter le format des données et organiser par jour
-    const weeklySchedule = {
-      sunday: [],
-      monday: [],
-      tuesday: [],
-      wednesday: [],
-      thursday: [],
-      friday: [],
-      saturday: []
-    };
-    
-    // Répartir les animes sur les jours de la semaine
-    // On utilise l'ID de l'anime pour déterminer le jour (pour avoir une répartition stable)
-    data.results.forEach(show => {
-      const dayIndex = show.id % 7;
-      const day = Object.keys(weeklySchedule)[dayIndex];
-      
-      weeklySchedule[day].push({
-        mal_id: show.id,
-        title: show.name,
-        synopsis: show.overview,
-        images: {
-          jpg: {
-            image_url: show.poster_path ? `https://image.tmdb.org/t/p/w500${show.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'
-          }
-        },
-        broadcast: {
-          string: `${getDayNameByIndex(dayIndex)} à ${formatTime(show.first_air_date)}`
-        }
-      });
-    });
-    
-    return weeklySchedule;
-  } catch (error) {
-    console.error('Erreur lors de la récupération du calendrier hebdomadaire:', error);
-    throw error;
-  }
+  console.warn('getWeeklyReleases est deprecated, utilisez useWeeklyReleases hook');
+  return {};
 };
 
-// Base URLs pour les plateformes de streaming par pays
-const streamingPlatformUrls = {
-  'France': {
-    'netflix': 'https://www.netflix.com/fr/',
-    'crunchyroll': 'https://www.crunchyroll.com/fr/',
-    'adn': 'https://animedigitalnetwork.fr/',
-    'prime video': 'https://www.primevideo.com/storefront/'
-  },
-  'Belgique': {
-    'netflix': 'https://www.netflix.com/be-fr/',
-    'crunchyroll': 'https://www.crunchyroll.com/fr/',
-    'adn': 'https://animedigitalnetwork.fr/',
-    'prime video': 'https://www.primevideo.com/storefront/'
-  },
-  'Suisse': {
-    'netflix': 'https://www.netflix.com/ch-fr/',
-    'crunchyroll': 'https://www.crunchyroll.com/fr/',
-    'adn': 'https://animedigitalnetwork.fr/',
-    'prime video': 'https://www.primevideo.com/storefront/'
-  },
-  'Canada': {
-    'netflix': 'https://www.netflix.com/ca-fr/',
-    'crunchyroll': 'https://www.crunchyroll.com/fr/',
-    'adn': null, // Non disponible
-    'prime video': 'https://www.primevideo.com/storefront/'
-  },
-  'default': {
-    'netflix': 'https://www.netflix.com/',
-    'crunchyroll': 'https://www.crunchyroll.com/',
-    'adn': null,
-    'prime video': 'https://www.primevideo.com/storefront/'
-  }
-};
-
-// Correspondance des providers TMDB avec nos plateformes
-const providerMapping = {
-  8: 'netflix',       // Netflix
-  283: 'crunchyroll', // Crunchyroll
-  531: 'adn',         // ADN (Animation Digital Network)
-  119: 'prime video', // Amazon Prime Video
-};
-
-// Récupérer les informations de disponibilité sur les plateformes avec les liens
-export const getStreamingInfo = async (animeId, country = 'France') => {
-  try {
-    // Récupérer les informations de l'anime depuis TMDB
-    const url = addApiKey(`${API_URL}/tv/${animeId}?language=fr-FR`);
-    const response = await fetch(url);
-    
-    const animeData = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(animeData.status_message || "Erreur lors de la récupération des données");
-    }
-
-    // Récupérer les plateformes de streaming disponibles pour cet anime
-    const providersUrl = addApiKey(`${API_URL}/tv/${animeId}/watch/providers`);
-    const providersResponse = await fetch(providersUrl);
-    
-    const providersData = await providersResponse.json();
-    
-    // Obtenir les URLs de base pour le pays sélectionné
-    const countryUrls = streamingPlatformUrls[country] || streamingPlatformUrls['default'];
-    
-    // Identifiants TMDB des pays
-    const countryMapping = {
-      'France': 'FR',
-      'Belgique': 'BE',
-      'Suisse': 'CH',
-      'Canada': 'CA',
-      'États-Unis': 'US',
-      'Royaume-Uni': 'GB',
-      'Japon': 'JP',
-      'Allemagne': 'DE',
-      'Espagne': 'ES',
-      'Italie': 'IT'
-    };
-    
-    const countryCode = countryMapping[country] || 'FR';
-    
-    // Extraire les plateformes disponibles dans le pays demandé
-    const countryProviders = providersData.results?.[countryCode]?.flatrate || [];
-    
-    // Initialiser les informations de streaming avec toutes les plateformes à non disponibles
-    const streamingInfo = {
-      'netflix': {
-        available: false,
-        url: null
-      },
-      'crunchyroll': {
-        available: false,
-        url: null
-      },
-      'adn': {
-        available: false,
-        url: null
-      },
-      'prime video': {
-        available: false,
-        url: null
-      }
-    };
-    
-    // Mettre à jour les plateformes disponibles selon TMDB
-    countryProviders.forEach(provider => {
-      const platform = providerMapping[provider.provider_id];
-      
-      if (platform && countryUrls[platform]) {
-        streamingInfo[platform] = {
-          available: true,
-          url: `${countryUrls[platform]}search?q=${encodeURIComponent(animeData.name)}`
-        };
-      }
-    });
-    
-    // Si TMDB ne renvoie pas d'informations de fournisseur, simuler la disponibilité pour les tests
-    if (countryProviders.length === 0) {
-      // Simulation basée sur l'ID comme avant
-      const idSum = animeId.toString().split('').reduce((sum, digit) => sum + parseInt(digit), 0);
-      
-      streamingInfo['netflix'].available = idSum % 2 === 0;
-      streamingInfo['crunchyroll'].available = idSum % 3 !== 0;
-      streamingInfo['adn'].available = idSum % 5 === 0 && countryUrls['adn'] !== null;
-      streamingInfo['prime video'].available = idSum % 4 !== 0;
-      
-      // Ajouter les URLs pour les plateformes disponibles
-      Object.entries(streamingInfo).forEach(([platform, info]) => {
-        if (info.available && countryUrls[platform]) {
-          streamingInfo[platform].url = `${countryUrls[platform]}search?q=${encodeURIComponent(animeData.name)}`;
-        }
-      });
-    }
-    
-    return streamingInfo;
-  } catch (error) {
-    console.error('Erreur lors de la récupération des informations de streaming:', error);
-    throw error;
-  }
-};
-
-// Fonctions utilitaires
-function getSeasonStartDate(season, year) {
-  switch (season.toLowerCase()) {
-    case 'winter': return `${year}-01-01`;
-    case 'spring': return `${year}-04-01`;
-    case 'summer': return `${year}-07-01`;
-    case 'fall': return `${year}-10-01`;
-    default: return `${year}-01-01`;
-  }
-}
-
-function getSeasonEndDate(season, year) {
-  switch (season.toLowerCase()) {
-    case 'winter': return `${year}-03-31`;
-    case 'spring': return `${year}-06-30`;
-    case 'summer': return `${year}-09-30`;
-    case 'fall': return `${year}-12-31`;
-    default: return `${year}-12-31`;
-  }
-}
-
-function getDayName(dayIndex) {
-  const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-  return days[dayIndex];
-}
-
-function getDayNameByIndex(dayIndex) {
-  return getDayName(dayIndex);
-}
-
-function formatTime(dateString) {
-  if (!dateString) return "Heure inconnue";
-  
-  // Générer une heure aléatoire mais stable pour le même anime
-  const hash = dateString.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hours = (hash % 24).toString().padStart(2, '0');
-  const minutes = ((hash * 13) % 60).toString().padStart(2, '0');
-  
-  return `${hours}h${minutes}`;
-}
-
-export default {
-  getSeasonalAnime,
-  getTodayReleases,
-  getWeeklyReleases,
-  getStreamingInfo,
-  useSeasonalAnime,
-  useTodayReleases,
-  useWeeklyReleases,
-  useStreamingInfo
+export const getStreamingInfo = async () => {
+  console.warn('getStreamingInfo est deprecated, utilisez useStreamingInfo hook');
+  return { availableOn: [] };
 };

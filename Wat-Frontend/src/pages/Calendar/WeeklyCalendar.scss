@@ -1,220 +1,284 @@
-@import '../../variables.scss';
+@use 'sass:color';
+@use '../../variables' as vars;
 
 .weekly-calendar {
   h1 {
-    background: linear-gradient(to right, $color-secondary, $color-accent);
+    background: linear-gradient(to right, vars.$color-secondary, vars.$color-accent);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     display: inline-block;
-    margin-bottom: $spacing-sm;
+    margin-bottom: vars.$spacing-sm;
     font-size: 2.5rem;
     text-transform: uppercase;
     letter-spacing: 1px;
   }
   
   .country-indicator {
-    margin-bottom: $spacing-md;
-    color: $color-text-secondary;
+    margin-bottom: vars.$spacing-md;
+    color: vars.$color-text-secondary;
+    text-align: center;
     
-    span {
-      font-weight: 600;
-      color: $color-text-primary;
-      border-bottom: 2px solid $color-secondary;
-      padding-bottom: 2px;
+    .country-flag {
+      font-size: 1.2rem;
+      margin-right: vars.$spacing-xs;
     }
   }
 }
 
-.platform-filter {
-  margin: $spacing-md 0 $spacing-lg;
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: vars.$spacing-lg;
   
-  span {
-    display: block;
-    margin-bottom: $spacing-sm;
-    color: $color-text-secondary;
-    font-size: 0.9rem;
-  }
-  
-  .filter-buttons {
+  .week-navigation {
     display: flex;
-    flex-wrap: wrap;
-    gap: $spacing-xs;
-    justify-content: center;
+    gap: vars.$spacing-sm;
     
     button {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background-color: $color-bg-card;
-      color: $color-text-secondary;
-      border: 2px solid transparent;
-      margin: 0;
-      font-size: 0.9rem;
-      padding: 0.5rem 1rem;
-      transition: all $transition-speed;
+      padding: vars.$spacing-sm vars.$spacing-md;
+      background-color: vars.$color-bg-card;
+      color: vars.$color-text-primary;
+      border: 1px solid vars.$color-bg-hover;
+      border-radius: vars.$border-radius-md;
+      cursor: pointer;
+      transition: all vars.$transition-speed vars.$transition-timing;
       
       &:hover {
-        background-color: lighten($color-bg-card, 5%);
-        transform: translateY(-2px);
+        background-color: vars.$color-bg-hover;
+        border-color: vars.$color-primary;
       }
       
-      &.active {
-        border-color: $color-secondary;
-        color: $color-text-primary;
-        background-color: rgba($color-secondary, 0.1);
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
     }
+  }
+  
+  .current-week {
+    color: vars.$color-text-primary;
+    font-weight: 600;
+    font-size: 1.1rem;
   }
 }
 
 .calendar-grid {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  gap: $spacing-md;
-  padding: $spacing-sm 0 $spacing-lg;
-  margin: $spacing-md (-$spacing-sm);
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: vars.$spacing-sm;
+  margin-bottom: vars.$spacing-lg;
   
-  &::-webkit-scrollbar {
-    height: 8px;
+  @media (max-width: vars.$breakpoint-lg) {
+    grid-template-columns: repeat(3, 1fr);
   }
   
-  &::-webkit-scrollbar-track {
-    background-color: rgba($color-bg-hover, 0.3);
-    border-radius: 10px;
+  @media (max-width: vars.$breakpoint-md) {
+    grid-template-columns: repeat(2, 1fr);
   }
   
-  &::-webkit-scrollbar-thumb {
-    background: $color-secondary;
-    border-radius: 10px;
-    
-    &:hover {
-      background: lighten($color-secondary, 10%);
-    }
+  @media (max-width: vars.$breakpoint-sm) {
+    grid-template-columns: 1fr;
   }
 }
 
-.day-column {
-  flex: 0 0 300px;
-  min-width: 300px;
-  background-color: $color-bg-card;
-  border-radius: $border-radius-lg;
-  padding: $spacing-md;
-  box-shadow: $box-shadow;
-  position: relative;
-  overflow: hidden;
-  
-  &.current-day {
-    border: 2px solid $color-primary;
-    
-    &::before {
-      content: "Aujourd'hui";
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background-color: $color-primary;
-      color: white;
-      padding: 3px 8px;
-      font-size: 0.7rem;
-      border-radius: $border-radius-sm;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-    }
-    
-    h2 {
-      color: $color-primary;
-    }
-  }
-  
-  h2 {
-    padding-bottom: $spacing-sm;
-    margin-bottom: $spacing-md;
-    border-bottom: 2px solid rgba($color-secondary, 0.3);
-    text-align: center;
-    font-size: 1.4rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-  }
-}
-
-.anime-list {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-md;
-  max-height: 600px;
-  overflow-y: auto;
-  
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background-color: rgba($color-bg-hover, 0.3);
-    border-radius: 10px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: $color-secondary;
-    border-radius: 10px;
-  }
-  
-  .no-anime-message {
-    color: $color-text-muted;
-    font-style: italic;
-    text-align: center;
-    padding: $spacing-md 0;
-  }
-}
-
-.calendar-anime-card {
-  display: flex;
-  align-items: center;
-  background-color: rgba($color-bg-hover, 0.5);
-  border-radius: $border-radius-md;
-  padding: $spacing-xs;
-  transition: transform $transition-speed $transition-timing, background-color 0.2s ease;
-  cursor: pointer;
+.day-card {
+  background-color: vars.$color-bg-card;
+  border-radius: vars.$border-radius-lg;
+  padding: vars.$spacing-md;
+  min-height: 300px;
+  transition: transform vars.$transition-speed vars.$transition-timing,
+              box-shadow vars.$transition-speed vars.$transition-timing;
   
   &:hover {
-    transform: translateY(-3px);
-    background-color: rgba($color-bg-hover, 0.8);
+    transform: translateY(-2px);
+    box-shadow: vars.$box-shadow;
   }
   
-  .calendar-anime-image {
-    width: 60px;
-    height: 80px;
-    border-radius: $border-radius-sm;
-    object-fit: cover;
-    border: 2px solid $color-secondary;
-    flex-shrink: 0;
-  }
-  
-  .calendar-anime-info {
-    margin-left: $spacing-sm;
-    text-align: left;
-    flex: 1;
+  &.today {
+    background: linear-gradient(135deg, vars.$color-primary, vars.$color-secondary);
+    color: white;
     
-    h3 {
-      font-size: 1rem;
-      margin: 0 0 $spacing-xs;
-      display: -webkit-box;
-      -webkit-line-clamp: 1;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+    .day-header {
+      color: white;
+    }
+    
+    .anime-count {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+  }
+  
+  .day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: vars.$spacing-md;
+    padding-bottom: vars.$spacing-sm;
+    border-bottom: 1px solid vars.$color-bg-hover;
+    
+    .day-name {
       font-weight: 600;
+      color: vars.$color-text-primary;
+      font-size: 1.1rem;
     }
     
-    p {
-      font-size: 0.8rem;
-      color: $color-text-muted;
-      margin: 0 0 $spacing-xs;
+    .day-date {
+      font-size: 0.9rem;
+      color: vars.$color-text-secondary;
     }
-    
-    .available-platforms {
+  }
+  
+  .anime-count {
+    display: inline-block;
+    background-color: vars.$color-primary;
+    color: white;
+    padding: vars.$spacing-xs vars.$spacing-sm;
+    border-radius: vars.$border-radius-sm;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-bottom: vars.$spacing-sm;
+  }
+  
+  .anime-list {
+    .anime-item {
       display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
+      align-items: center;
+      padding: vars.$spacing-sm;
+      margin-bottom: vars.$spacing-xs;
+      background-color: vars.$color-bg-hover;
+      border-radius: vars.$border-radius-md;
+      transition: background-color vars.$transition-speed vars.$transition-timing;
+      
+      &:hover {
+        background-color: color.adjust(vars.$color-bg-hover, $lightness: 10%);
+      }
+      
+      .anime-poster {
+        width: 40px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: vars.$border-radius-sm;
+        margin-right: vars.$spacing-sm;
+        background-color: vars.$color-bg-dark;
+      }
+      
+      .anime-details {
+        flex: 1;
+        min-width: 0;
+        
+        .anime-title {
+          font-weight: 500;
+          color: vars.$color-text-primary;
+          font-size: 0.9rem;
+          margin-bottom: vars.$spacing-xs;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        
+        .anime-time {
+          color: vars.$color-text-secondary;
+          font-size: 0.8rem;
+        }
+        
+        .anime-episode {
+          color: vars.$color-accent;
+          font-size: 0.8rem;
+          font-weight: 500;
+        }
+      }
     }
+  }
+  
+  .no-releases {
+    text-align: center;
+    color: vars.$color-text-muted;
+    font-style: italic;
+    padding: vars.$spacing-lg 0;
+  }
+}
+
+.view-toggles {
+  display: flex;
+  justify-content: center;
+  gap: vars.$spacing-sm;
+  margin-bottom: vars.$spacing-lg;
+  
+  button {
+    padding: vars.$spacing-sm vars.$spacing-md;
+    background-color: vars.$color-bg-card;
+    color: vars.$color-text-secondary;
+    border: 1px solid vars.$color-bg-hover;
+    border-radius: vars.$border-radius-md;
+    cursor: pointer;
+    transition: all vars.$transition-speed vars.$transition-timing;
+    
+    &:hover {
+      background-color: vars.$color-bg-hover;
+      color: vars.$color-text-primary;
+    }
+    
+    &.active {
+      background-color: vars.$color-primary;
+      color: white;
+      border-color: vars.$color-primary;
+    }
+  }
+}
+
+.loading-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: vars.$spacing-sm;
+  
+  .loading-day {
+    background-color: vars.$color-bg-card;
+    border-radius: vars.$border-radius-lg;
+    padding: vars.$spacing-md;
+    height: 300px;
+    
+    .skeleton {
+      background: linear-gradient(90deg, vars.$color-bg-hover 25%, vars.$color-bg-card 50%, vars.$color-bg-hover 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+      border-radius: vars.$border-radius-sm;
+    }
+    
+    .skeleton-header {
+      height: 20px;
+      margin-bottom: vars.$spacing-sm;
+    }
+    
+    .skeleton-item {
+      height: 60px;
+      margin-bottom: vars.$spacing-xs;
+    }
+  }
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: vars.$breakpoint-md) {
+  .weekly-calendar h1 {
+    font-size: 2rem;
+  }
+  
+  .calendar-header {
+    flex-direction: column;
+    gap: vars.$spacing-md;
+    text-align: center;
+  }
+  
+  .day-card {
+    min-height: 250px;
   }
 }

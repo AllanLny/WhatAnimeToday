@@ -1,4 +1,5 @@
-@import './variables.scss';
+@use 'sass:color';
+@use './variables' as vars;
 
 #root {
   width: 100%;
@@ -13,8 +14,8 @@
 }
 
 .app-header {
-  padding: $spacing-md;
-  background-color: rgba($color-bg-dark, 0.9);
+  padding: vars.$spacing-md;
+  background-color: rgba(vars.$color-bg-dark, 0.9);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
@@ -22,86 +23,107 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 
   h1 {
-    margin: $spacing-sm 0;
-    color: $color-primary;
+    margin: vars.$spacing-sm 0;
+    color: vars.$color-text-primary;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
-    text-shadow: 0 0 10px rgba($color-primary, 0.5);
+    font-size: 1.8rem;
     
-    &::after {
-      content: '';
-      display: block;
-      width: 40px;
-      height: 4px;
-      background: linear-gradient(to right, $color-primary, $color-secondary);
-      margin: $spacing-xs auto 0;
-      border-radius: $border-radius-sm;
-    }
-  }
-
-  nav {
-    margin-top: $spacing-md;
-
-    .nav-list {
-      display: flex;
-      justify-content: center;
-      list-style: none;
-      padding: 0;
-
-      li {
-        margin: 0 $spacing-sm;
-
-        a {
-          position: relative;
-          display: block;
-          padding: $spacing-xs $spacing-sm;
-          text-decoration: none;
-          color: $color-text-primary;
-          font-weight: 500;
-          transition: all $transition-speed $transition-timing;
-          
-          &::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 3px;
-            background: linear-gradient(to right, $color-primary, $color-secondary);
-            transition: width $transition-speed $transition-timing;
-            border-radius: 2px;
-          }
-          
-          &:hover, &.active {
-            color: $color-primary;
-            
-            &::after {
-              width: 70%;
-            }
-          }
-        }
-      }
-    }
+    background: linear-gradient(135deg, vars.$color-primary, vars.$color-secondary);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 }
 
-.main-content {
+.app-main {
   flex: 1;
-  padding: $spacing-md;
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
+  padding: vars.$spacing-lg vars.$spacing-md;
+  
+  @media (max-width: vars.$breakpoint-md) {
+    padding: vars.$spacing-md vars.$spacing-sm;
+  }
 }
 
-.app-footer {
-  padding: $spacing-md;
-  background-color: rgba($color-bg-dark, 0.9);
-  margin-top: auto;
+.app-navigation {
+  display: flex;
+  justify-content: center;
+  gap: vars.$spacing-sm;
+  margin-bottom: vars.$spacing-lg;
+
+  .nav-link {
+    padding: vars.$spacing-sm vars.$spacing-md;
+    background-color: vars.$color-bg-card;
+    border-radius: vars.$border-radius-md;
+    color: vars.$color-text-secondary;
+    text-decoration: none;
+    transition: all vars.$transition-speed vars.$transition-timing;
+    border: 1px solid transparent;
+
+    &:hover {
+      background-color: color.adjust(vars.$color-bg-card, $lightness: 10%);
+      color: vars.$color-text-primary;
+      border-color: vars.$color-primary;
+      transform: translateY(-1px);
+    }
+
+    &.active {
+      background-color: vars.$color-primary;
+      color: white;
+      box-shadow: vars.$box-shadow;
+    }
+  }
+}
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
   
-  p {
-    font-size: 0.9rem;
-    color: $color-text-muted;
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid vars.$color-bg-hover;
+    border-top: 3px solid vars.$color-primary;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-message {
+  background-color: color.adjust(vars.$color-primary, $lightness: -40%);
+  color: vars.$color-text-primary;
+  padding: vars.$spacing-md;
+  border-radius: vars.$border-radius-md;
+  margin: vars.$spacing-md 0;
+  border-left: 4px solid vars.$color-primary;
+}
+
+.country-selector {
+  display: flex;
+  justify-content: center;
+  margin-bottom: vars.$spacing-lg;
+  
+  select {
+    padding: vars.$spacing-sm vars.$spacing-md;
+    background-color: vars.$color-bg-card;
+    color: vars.$color-text-primary;
+    border: 1px solid vars.$color-bg-hover;
+    border-radius: vars.$border-radius-md;
+    font-size: 1rem;
+    cursor: pointer;
+    
+    &:focus {
+      outline: none;
+      border-color: vars.$color-primary;
+      box-shadow: 0 0 0 2px rgba(vars.$color-primary, 0.2);
+    }
   }
 }

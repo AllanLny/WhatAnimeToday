@@ -1,93 +1,147 @@
-@import '../../variables.scss';
+@use 'sass:color';
+@use '../../variables' as vars;
 
 .settings-container {
   max-width: 600px;
   margin: 0 auto;
-  padding: $spacing-lg;
+  padding: vars.$spacing-lg;
   
   h1 {
-    background: linear-gradient(to right, $color-accent, $color-secondary);
+    background: linear-gradient(to right, vars.$color-accent, vars.$color-secondary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     display: inline-block;
-    margin-bottom: $spacing-xl;
+    margin-bottom: vars.$spacing-xl;
   }
 }
 
 .settings-form {
-  background-color: $color-bg-card;
-  padding: $spacing-lg;
-  border-radius: $border-radius-lg;
-  box-shadow: $box-shadow;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: $spacing-lg;
+  background-color: vars.$color-bg-card;
+  padding: vars.$spacing-lg;
+  border-radius: vars.$border-radius-lg;
+  box-shadow: vars.$box-shadow;
   
-  label {
+  .form-group {
+    margin-bottom: vars.$spacing-md;
     text-align: left;
-    margin-bottom: $spacing-sm;
-    font-weight: 500;
-    color: $color-text-primary;
+    
+    label {
+      display: block;
+      color: vars.$color-text-primary;
+      font-weight: 500;
+      margin-bottom: vars.$spacing-xs;
+    }
+    
+    select, input {
+      width: 100%;
+      padding: vars.$spacing-sm;
+      background-color: vars.$color-bg-hover;
+      border: 1px solid vars.$color-bg-hover;
+      border-radius: vars.$border-radius-md;
+      color: vars.$color-text-primary;
+      font-size: 1rem;
+      
+      &:focus {
+        outline: none;
+        border-color: vars.$color-primary;
+        box-shadow: 0 0 0 2px rgba(vars.$color-primary, 0.2);
+      }
+    }
+  }
+  
+  .preferences-section {
+    margin: vars.$spacing-lg 0;
+    
+    h3 {
+      color: vars.$color-text-primary;
+      margin-bottom: vars.$spacing-md;
+      padding-bottom: vars.$spacing-xs;
+      border-bottom: 1px solid vars.$color-bg-hover;
+    }
+  }
+  
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: vars.$spacing-sm;
+    
+    input[type="checkbox"] {
+      width: auto;
+      margin-right: vars.$spacing-sm;
+      accent-color: vars.$color-primary;
+    }
+    
+    label {
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+  }
+  
+  .save-button {
+    background: linear-gradient(135deg, vars.$color-primary, vars.$color-secondary);
+    color: white;
+    padding: vars.$spacing-sm vars.$spacing-lg;
+    border: none;
+    border-radius: vars.$border-radius-md;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform vars.$transition-speed vars.$transition-timing;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: vars.$box-shadow-hover;
+    }
   }
 }
 
-.country-select {
-  padding: $spacing-sm;
-  border-radius: $border-radius-md;
-  border: 2px solid $color-bg-hover;
-  background-color: $color-bg-dark;
-  color: $color-text-primary;
-  font-size: 1rem;
-  transition: border-color $transition-speed;
-  outline: none;
-  appearance: none;
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>');
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 30px;
+.theme-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: vars.$spacing-sm;
+  margin-top: vars.$spacing-md;
   
-  &:focus {
-    border-color: $color-secondary;
-    box-shadow: 0 0 0 2px rgba($color-secondary, 0.25);
-  }
-  
-  option {
-    background-color: $color-bg-dark;
-    color: $color-text-primary;
+  .theme-option {
+    padding: vars.$spacing-sm;
+    border-radius: vars.$border-radius-md;
+    cursor: pointer;
+    transition: all vars.$transition-speed vars.$transition-timing;
+    border: 2px solid transparent;
+    
+    &:hover {
+      border-color: vars.$color-primary;
+    }
+    
+    &.selected {
+      border-color: vars.$color-primary;
+      box-shadow: vars.$box-shadow;
+    }
+    
+    .theme-name {
+      font-size: 0.9rem;
+      margin-bottom: vars.$spacing-xs;
+    }
+    
+    .color-palette {
+      display: flex;
+      gap: 2px;
+      height: 20px;
+      border-radius: vars.$border-radius-sm;
+      overflow: hidden;
+      
+      .color-swatch {
+        flex: 1;
+        height: 100%;
+      }
+    }
   }
 }
 
-.settings-info {
-  text-align: left;
-  background-color: rgba($color-secondary, 0.1);
-  padding: $spacing-md;
-  border-left: 4px solid $color-secondary;
-  border-radius: $border-radius-sm;
-  font-size: 0.9rem;
-  color: $color-text-secondary;
-  margin: $spacing-md 0;
-}
-
-.save-button {
-  background: linear-gradient(to right, $color-primary, $color-secondary);
-  color: white;
-  padding: $spacing-sm $spacing-xl;
-  border: none;
-  margin-top: $spacing-md;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  transition: all $transition-speed;
-  
-  &:hover {
-    background: linear-gradient(to right, darken($color-primary, 5%), darken($color-secondary, 5%));
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+@media (max-width: vars.$breakpoint-md) {
+  .settings-container {
+    padding: vars.$spacing-md;
   }
   
-  &:active {
-    transform: translateY(0);
+  .settings-form {
+    padding: vars.$spacing-md;
   }
 }

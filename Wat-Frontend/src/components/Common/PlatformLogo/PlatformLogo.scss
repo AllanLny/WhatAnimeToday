@@ -1,4 +1,5 @@
-@import '../../../variables.scss';
+@use 'sass:color';
+@use '../../../variables' as vars;
 
 .platform-logo {
   border-radius: 8px;
@@ -19,53 +20,81 @@
   &.medium {
     width: 32px;
     height: 32px;
-    font-size: 16px;
+    font-size: 14px;
   }
   
   &.large {
     width: 48px;
     height: 48px;
-    font-size: 22px;
+    font-size: 18px;
   }
   
-  svg {
-    width: 70%;
-    height: 70%;
-    display: block;
+  // Platform specific colors
+  &.crunchyroll {
+    background: linear-gradient(135deg, #ff6500, #ff4500);
+  }
+  
+  &.funimation {
+    background: linear-gradient(135deg, #5c2a9d, #8a2be2);
+  }
+  
+  &.netflix {
+    background: linear-gradient(135deg, #e50914, #b20710);
+  }
+  
+  &.hulu {
+    background: linear-gradient(135deg, #1ce783, #00b359);
+  }
+  
+  &.hidive {
+    background: linear-gradient(135deg, #ff1744, #d50000);
+  }
+  
+  &.wakanim {
+    background: linear-gradient(135deg, #00bcd4, #0097a7);
+  }
+  
+  &.aniplus {
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+  }
+  
+  &.default {
+    background: linear-gradient(135deg, vars.$color-primary, vars.$color-secondary);
+  }
+  
+  // Hover effects
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    transition: all vars.$transition-speed vars.$transition-timing;
+  }
+  
+  // Platform text
+  .platform-text {
+    font-family: vars.$font-family-title;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
   }
 }
 
-.netflix-logo {
-  background: #e50914;
-  border-radius: 4px;
-}
-
-.crunchyroll-logo {
-  background: #f47521;
-  border-radius: 4px;
-}
-
-.adn-logo {
-  background: #00abe4;
-  border-radius: 4px;
-}
-
-.prime-logo {
-  background: #00a8e1;
-  border-radius: 4px;
-}
-
-.disney-logo {
-  background: #113ccf;
-  border-radius: 4px;
-}
-
-.default-logo {
-  background: #888;
-  border-radius: 4px;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+// Tooltip styles
+.platform-tooltip {
+  position: relative;
+  
+  &:hover::after {
+    content: attr(data-platform);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: vars.$color-bg-dark;
+    color: vars.$color-text-primary;
+    padding: vars.$spacing-xs vars.$spacing-sm;
+    border-radius: vars.$border-radius-sm;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    box-shadow: vars.$box-shadow;
+    z-index: 1000;
+    margin-bottom: 4px;
+  }
 }

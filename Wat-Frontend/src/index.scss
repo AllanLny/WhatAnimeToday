@@ -1,14 +1,15 @@
+@use 'sass:color';
+@use './variables' as vars;
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
-@import './variables.scss';
 
 :root {
-  font-family: $font-family-main;
+  font-family: vars.$font-family-main;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: dark;
-  color: $color-text-primary;
-  background-color: $color-bg-dark;
+  color: vars.$color-text-primary;
+  background-color: vars.$color-bg-dark;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,7 +26,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: $color-bg-dark;
+  background-color: vars.$color-bg-dark;
   background-image: 
     linear-gradient(to bottom, rgba(18, 18, 18, 0.95), rgba(18, 18, 18, 1)),
     url('/assets/anime-pattern.png');
@@ -41,94 +42,113 @@ body {
 
 a {
   font-weight: 500;
-  color: $color-primary;
+  color: vars.$color-primary;
   text-decoration: none;
-  transition: color $transition-speed $transition-timing;
+  transition: color vars.$transition-speed vars.$transition-timing;
 
   &:hover {
-    color: lighten($color-primary, 15%);
+    color: color.adjust(vars.$color-primary, $lightness: 15%);
     text-decoration: underline;
   }
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: $font-family-title;
-  color: $color-text-primary;
-  margin-bottom: $spacing-md;
+  font-family: vars.$font-family-title;
+  color: vars.$color-text-primary;
+  margin-bottom: vars.$spacing-sm;
   font-weight: 600;
   letter-spacing: -0.5px;
 }
 
+// Styles pour les titres
 h1 {
   font-size: 2.5rem;
-  line-height: 1.2;
-  
-  @media (min-width: $breakpoint-md) {
-    font-size: 3rem;
-  }
+  margin-bottom: vars.$spacing-lg;
+  background: linear-gradient(135deg, vars.$color-primary, vars.$color-secondary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-align: center;
 }
 
 h2 {
-  font-size: 1.75rem;
-  
-  @media (min-width: $breakpoint-md) {
-    font-size: 2.25rem;
-  }
+  font-size: 2rem;
+  margin-bottom: vars.$spacing-md;
 }
 
+h3 {
+  font-size: 1.5rem;
+  margin-bottom: vars.$spacing-sm;
+}
+
+// Boutons
 button {
-  border-radius: $border-radius-md;
-  border: 1px solid $color-primary;
-  padding: 0.6em 1.2em;
+  border-radius: vars.$border-radius-md;
+  border: 1px solid transparent;
+  padding: vars.$spacing-sm vars.$spacing-md;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: $color-primary;
-  color: white;
+  background-color: vars.$color-bg-card;
+  color: vars.$color-text-primary;
   cursor: pointer;
-  transition: all $transition-speed $transition-timing;
+  transition: border-color vars.$transition-speed vars.$transition-timing;
 
   &:hover {
-    background-color: darken($color-primary, 10%);
-    border-color: darken($color-primary, 10%);
+    border-color: vars.$color-primary;
+    background-color: color.adjust(vars.$color-bg-card, $lightness: 10%);
+  }
+
+  &:focus,
+  &:focus-visible {
+    outline: 4px auto -webkit-focus-ring-color;
+  }
+}
+
+// Styles des cartes
+.card {
+  background-color: vars.$color-bg-card;
+  border-radius: vars.$border-radius-lg;
+  padding: vars.$spacing-md;
+  margin-bottom: vars.$spacing-md;
+  box-shadow: vars.$box-shadow;
+  transition: transform vars.$transition-speed vars.$transition-timing,
+              box-shadow vars.$transition-speed vars.$transition-timing;
+
+  &:hover {
     transform: translateY(-2px);
+    box-shadow: vars.$box-shadow-hover;
+  }
+}
+
+// Utilitaires
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: vars.$color-text-muted;
+}
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: vars.$spacing-xs; }
+.mb-2 { margin-bottom: vars.$spacing-sm; }
+.mb-3 { margin-bottom: vars.$spacing-md; }
+.mb-4 { margin-bottom: vars.$spacing-lg; }
+
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: vars.$spacing-xs; }
+.mt-2 { margin-top: vars.$spacing-sm; }
+.mt-3 { margin-top: vars.$spacing-md; }
+.mt-4 { margin-top: vars.$spacing-lg; }
+
+// Media queries
+@media (max-width: vars.$breakpoint-md) {
+  h1 {
+    font-size: 2rem;
   }
   
-  &:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba($color-primary, 0.5);
+  h2 {
+    font-size: 1.5rem;
   }
-}
-
-.loading-spinner {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 50vh;
-  color: $color-primary;
-  font-size: 1.5rem;
-  
-  &::after {
-    content: '';
-    display: block;
-    width: 40px;
-    height: 40px;
-    margin-left: $spacing-sm;
-    border-radius: 50%;
-    border: 3px solid $color-secondary;
-    border-top-color: $color-primary;
-    animation: spin 1s infinite linear;
-  }
-}
-
-.error-message {
-  background-color: rgba(255, 64, 87, 0.1);
-  border-left: 4px solid $color-primary;
-  padding: $spacing-md;
-  border-radius: $border-radius-md;
-  margin: $spacing-lg 0;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
