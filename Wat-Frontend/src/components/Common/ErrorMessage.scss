@@ -1,0 +1,64 @@
+@use '../../variables' as vars;
+@use 'sass:color';
+@use 'sass:map';
+
+.error-container {
+  padding: vars.$spacing-md;
+  border-radius: vars.$border-radius-md;
+  margin: vars.$spacing-md auto;
+  max-width: 600px;
+  border-left: 4px solid;
+  
+  .error-content {
+    display: flex;
+    align-items: flex-start;
+    gap: vars.$spacing-sm;
+    
+    .error-icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    
+    .error-text {
+      margin: 0;
+      flex: 1;
+      line-height: 1.4;
+    }
+  }
+  
+  .error-retry-btn {
+    margin-top: vars.$spacing-sm;
+    padding: vars.$spacing-xs vars.$spacing-sm;
+    background: transparent;
+    border: 1px solid currentColor;
+    border-radius: vars.$border-radius-sm;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background-color: color.adjust(map.get(vars.$colors, 'bg-primary'), $alpha: -0.8);
+    }
+  }
+}
+
+// 🚨 Types d'erreurs avec couleurs différentes
+.error-type-error {
+  background-color: color.adjust(map.get(vars.$colors, 'primary'), $lightness: -40%, $alpha: -0.9);
+  border-left-color: map.get(vars.$colors, 'primary');
+  color: map.get(vars.$colors, 'text-primary');
+}
+
+.error-type-warning {
+  background-color: color.adjust(#ff9800, $lightness: -40%, $alpha: -0.9);
+  border-left-color: #ff9800;
+  color: #fff;
+}
+
+.error-type-info {
+  background-color: color.adjust(#2196f3, $lightness: -40%, $alpha: -0.9);
+  border-left-color: #2196f3;
+  color: #fff;
+}

@@ -1,79 +1,86 @@
 @use 'sass:color';
+@use 'sass:map';
 @use './variables' as vars;
 
-#root {
-  width: 100%;
+// Application principale - design 2025
+.app {
   min-height: 100vh;
-  text-align: center;
-}
-
-.app-container {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-.app-header {
-  padding: vars.$spacing-md;
-  background-color: rgba(vars.$color-bg-dark, 0.9);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-
-  h1 {
-    margin: vars.$spacing-sm 0;
-    color: vars.$color-text-primary;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 1.8rem;
-    
-    background: linear-gradient(135deg, vars.$color-primary, vars.$color-secondary);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-}
-
-.app-main {
-  flex: 1;
-  padding: vars.$spacing-lg vars.$spacing-md;
+  background: map.get(vars.$colors, 'bg-primary');
+  color: map.get(vars.$colors, 'text-primary');
   
-  @media (max-width: vars.$breakpoint-md) {
-    padding: vars.$spacing-md vars.$spacing-sm;
+  // Assure la cohérence de la font dans toute l'app
+  font-family: vars.$font-family-base;
+  line-height: vars.$line-height-base;
+  
+  // Reset par défaut
+  margin: 0;
+  padding: 0;
+}
+
+// 🎯 Styles spécifiques pour les pages temporaires/placeholder uniquement
+.placeholder-content,
+.temp-page,
+.coming-soon {
+  padding: vars.$spacing-lg;
+  text-align: center;
+  color: map.get(vars.$colors, 'text-secondary');
+  background: map.get(vars.$colors, 'bg-card');
+  border-radius: vars.$border-radius-lg;
+  margin: vars.$spacing-lg;
+  
+  h1, h2, h3 {
+    color: map.get(vars.$colors, 'primary');
+    margin-bottom: vars.$spacing-md;
+  }
+  
+  p {
+    color: map.get(vars.$colors, 'text-muted');
+  }
+  
+  .coming-soon-note {
+    font-style: italic;
+    margin-top: vars.$spacing-md;
+    color: map.get(vars.$colors, 'text-muted');
   }
 }
 
-.app-navigation {
+// 🔧 Assure que les React Query DevTools sont bien positionnés
+[data-testid="devtools"] {
+  z-index: 9999;
+}
+
+// 🌀 Loading spinner global
+.loading-spinner {
   display: flex;
   justify-content: center;
-  gap: vars.$spacing-sm;
-  margin-bottom: vars.$spacing-lg;
-
-  .nav-link {
-    padding: vars.$spacing-sm vars.$spacing-md;
-    background-color: vars.$color-bg-card;
-    border-radius: vars.$border-radius-md;
-    color: vars.$color-text-secondary;
-    text-decoration: none;
-    transition: all vars.$transition-speed vars.$transition-timing;
-    border: 1px solid transparent;
-
-    &:hover {
-      background-color: color.adjust(vars.$color-bg-card, $lightness: 10%);
-      color: vars.$color-text-primary;
-      border-color: vars.$color-primary;
-      transform: translateY(-1px);
-    }
-
-    &.active {
-      background-color: vars.$color-primary;
-      color: white;
-      box-shadow: vars.$box-shadow;
-    }
+  align-items: center;
+  height: 200px;
+  
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid map.get(vars.$colors, 'bg-hover');
+    border-top: 3px solid map.get(vars.$colors, 'primary');
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+// 🚨 Messages d'erreur globaux
+.error-message {
+  background-color: color.adjust(map.get(vars.$colors, 'primary'), $lightness: -40%);
+  color: map.get(vars.$colors, 'text-primary');
+  padding: vars.$spacing-md;
+  border-radius: vars.$border-radius-md;
+  margin: vars.$spacing-md auto;
+  border-left: 4px solid map.get(vars.$colors, 'primary');
+  max-width: 600px;
+  text-align: center;
 }
 
 .loading-spinner {

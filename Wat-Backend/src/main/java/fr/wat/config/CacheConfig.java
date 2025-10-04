@@ -24,7 +24,7 @@ public class CacheConfig {
                 .recordStats());
         
         // Définir les noms des caches
-        cacheManager.setCacheNames(java.util.Arrays.asList("todayReleases", "weeklyCalendar", "animeDetails"));
+        cacheManager.setCacheNames(java.util.Arrays.asList("todayReleases", "weeklyCalendar", "animeDetails", "globalStats"));
         
         return cacheManager;
     }

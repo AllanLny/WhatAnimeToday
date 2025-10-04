@@ -1,36 +1,214 @@
-// Palette de couleurs
-$color-bg-dark: #121212;
-$color-bg-card: #1e1e1e;
-$color-bg-hover: #2a2a2a;
+// === WAT 2025 Design System === //
+@use 'sass:map';
 
-$color-primary: #ff4057; 
-$color-secondary: #9b59ff; 
-$color-accent: #ff9d00; 
+// 🎨 Color Palette - Dark & Red Theme
+$colors: (
+  // Primary Red Palette
+  'primary': #ff3b3b,
+  'primary-light': #ff6b6b,
+  'primary-dark': #e53935,
+  'primary-hover': #ff5252,
+  
+  // Secondary colors - AJOUT DES VARIABLES MANQUANTES
+  'secondary': #ef4444,      // Rouge secondaire
+  'accent': #fbbf24,         // Accent doré
+  
+  // Dark Background Palette
+  'bg-primary': #0a0a0a,
+  'bg-secondary': #1a1a1a,
+  'bg-tertiary': #2a2a2a,
+  'bg-card': #1e1e1e,
+  'bg-hover': #333333,
+  
+  // Text Colors
+  'text-primary': #ffffff,
+  'text-secondary': #b3b3b3,
+  'text-muted': #666666,
+  'text-disabled': #404040,
+  
+  // Accent Colors
+  'accent-green': #4caf50,
+  'accent-blue': #2196f3,
+  'accent-yellow': #ffc107,
+  'accent-purple': #9c27b0,
+  
+  // Status Colors
+  'success': #4caf50,
+  'warning': #ff9800,
+  'error': #f44336,
+  'info': #2196f3,
+  
+  // Borders & Dividers
+  'border-light': #333333,
+  'border-medium': #444444,
+  'border-heavy': #555555,
+  
+  // Glass effect
+  'glass-bg': rgba(255, 255, 255, 0.05),
+  'glass-border': rgba(255, 255, 255, 0.1)
+);
 
-$color-text-primary: rgba(255, 255, 255, 0.9);
-$color-text-secondary: rgba(255, 255, 255, 0.7);
-$color-text-muted: rgba(255, 255, 255, 0.5);
+// 📐 Spacing System (8px base)
+$spacing: (
+  'xs': 0.25rem,    // 4px
+  'sm': 0.5rem,     // 8px
+  'md': 1rem,       // 16px
+  'lg': 1.5rem,     // 24px
+  'xl': 2rem,       // 32px
+  '2xl': 3rem,      // 48px
+  '3xl': 4rem,      // 64px
+  '4xl': 6rem       // 96px
+);
 
-// Espacement
-$spacing-xs: 0.5rem;
-$spacing-sm: 1rem;
-$spacing-md: 1.5rem;
-$spacing-lg: 2rem;
-$spacing-xl: 3rem;
+// 📱 Responsive Breakpoints
+$breakpoints: (
+  'xs': 320px,
+  'sm': 640px,
+  'md': 768px,
+  'lg': 1024px,
+  'xl': 1280px,
+  '2xl': 1536px
+);
 
-// Breakpoints
-$breakpoint-sm: 576px;
-$breakpoint-md: 768px;
-$breakpoint-lg: 992px;
-$breakpoint-xl: 1200px;
+// 🔤 Typography Scale
+$font-sizes: (
+  'xs': 0.75rem,    // 12px
+  'sm': 0.875rem,   // 14px
+  'base': 1rem,     // 16px
+  'lg': 1.125rem,   // 18px
+  'xl': 1.25rem,    // 20px
+  '2xl': 1.5rem,    // 24px
+  '3xl': 1.875rem,  // 30px
+  '4xl': 2.25rem,   // 36px
+  '5xl': 3rem       // 48px
+);
 
-// Bordures et ombres
-$border-radius-sm: 4px;
-$border-radius-md: 8px;
-$border-radius-lg: 12px;
+$font-weights: (
+  'light': 300,
+  'normal': 400,
+  'medium': 500,
+  'semibold': 600,
+  'bold': 700,
+  'extrabold': 800
+);
+
+// 🌊 Animations & Transitions
+$transitions: (
+  'fast': 0.15s ease-out,
+  'normal': 0.3s ease-out,
+  'slow': 0.5s ease-out
+);
+
+// 🎭 Shadows & Effects
+$shadows: (
+  'sm': '0 1px 3px rgba(0, 0, 0, 0.3)',
+  'md': '0 4px 12px rgba(0, 0, 0, 0.4)',
+  'lg': '0 8px 25px rgba(0, 0, 0, 0.5)',
+  'xl': '0 20px 40px rgba(0, 0, 0, 0.6)',
+  'glow-red': '0 0 20px rgba(255, 59, 59, 0.3)',
+  'glow-red-strong': '0 0 30px rgba(255, 59, 59, 0.5)'
+);
+
+// 📏 Border Radius
+$radius: (
+  'none': 0,
+  'sm': 0.25rem,    // 4px
+  'md': 0.5rem,     // 8px
+  'lg': 0.75rem,    // 12px
+  'xl': 1rem,       // 16px
+  '2xl': 1.5rem,    // 24px
+  'full': 9999px
+);
+
+// 🎨 Gradients
+$gradients: (
+  'primary': 'linear-gradient(135deg, #ff3b3b 0%, #e53935 100%)',
+  'dark': 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
+  'glass': 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)'
+);
+
+// 🚀 Z-Index Scale
+$z-index: (
+  'dropdown': 1000,
+  'sticky': 1020,
+  'fixed': 1030,
+  'modal-backdrop': 1040,
+  'modal': 1050,
+  'popover': 1060,
+  'tooltip': 1070
+);
+
+// Helper Functions
+@function color($name) {
+  @return map.get($colors, $name);
+}
+
+@function spacing($name) {
+  @return map.get($spacing, $name);
+}
+
+@function breakpoint($name) {
+  @return map.get($breakpoints, $name);
+}
+
+@function font-size($name) {
+  @return map.get($font-sizes, $name);
+}
+
+@function shadow($name) {
+  @return map.get($shadows, $name);
+}
+
+@function radius($name) {
+  @return map.get($radius, $name);
+}
+
+// Legacy variables for compatibility
+$color-bg-dark: map.get($colors, 'bg-primary');
+$color-bg-primary: map.get($colors, 'bg-primary');  // AJOUT VARIABLE MANQUANTE
+$color-bg-card: map.get($colors, 'bg-card');
+$color-bg-hover: map.get($colors, 'bg-hover');
+$color-primary: map.get($colors, 'primary');
+$color-secondary: map.get($colors, 'secondary');    // AJOUT VARIABLE MANQUANTE
+$color-accent: map.get($colors, 'accent');          // AJOUT VARIABLE MANQUANTE
+$color-text-primary: map.get($colors, 'text-primary');
+$color-text-secondary: map.get($colors, 'text-secondary');
+$color-text-muted: map.get($colors, 'text-muted');
+
+$spacing-xs: map.get($spacing, 'xs');
+$spacing-sm: map.get($spacing, 'sm');
+$spacing-md: map.get($spacing, 'md');
+$spacing-lg: map.get($spacing, 'lg');
+$spacing-xl: map.get($spacing, 'xl');
+
+$breakpoint-sm: map.get($breakpoints, 'sm');
+$breakpoint-md: map.get($breakpoints, 'md');
+$breakpoint-lg: map.get($breakpoints, 'lg');
+$breakpoint-xl: map.get($breakpoints, 'xl');
 
 $box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 $box-shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.5);
+
+// Border radius variables
+$border-radius-sm: map.get($radius, 'sm');
+$border-radius-md: map.get($radius, 'md');
+$border-radius-lg: map.get($radius, 'lg');
+$border-radius-xl: map.get($radius, 'xl');
+
+// Transition variables
+$transition-fast: map.get($transitions, 'fast');
+$transition-normal: map.get($transitions, 'normal');
+$transition-slow: map.get($transitions, 'slow');
+
+// Font variables
+$font-size-xs: map.get($font-sizes, 'xs');
+$font-size-sm: map.get($font-sizes, 'sm');
+$font-size-base: map.get($font-sizes, 'base');
+$font-size-lg: map.get($font-sizes, 'lg');
+$font-size-xl: map.get($font-sizes, 'xl');
+
+$line-height-base: 1.6;
+$font-family-base: 'Inter', 'Helvetica Neue', sans-serif;
 
 // Animations
 $transition-speed: 0.3s;

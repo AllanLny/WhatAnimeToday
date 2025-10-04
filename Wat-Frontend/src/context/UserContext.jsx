@@ -11,7 +11,7 @@ export const UserProvider = ({ children }) => {
   const [country, setCountry] = useState(() => {
     // Essayer de récupérer le pays depuis le localStorage
     const savedCountry = localStorage.getItem('userCountry');
-    return savedCountry || 'France'; // Pays par défaut
+    return savedCountry || 'FR'; // Code pays par défaut (France)
   });
 
   // Mettre à jour le localStorage quand le pays change

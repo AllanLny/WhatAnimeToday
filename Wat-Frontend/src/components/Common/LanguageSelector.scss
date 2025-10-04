@@ -1,0 +1,111 @@
+@use '../../variables' as vars;
+@use 'sass:map';
+
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: vars.$spacing-sm;
+
+  .language-label {
+    font-size: 0.9rem;
+    color: map.get(vars.$colors, 'text-secondary');
+    font-weight: 500;
+  }
+
+  .language-buttons {
+    display: flex;
+    gap: vars.$spacing-xs;
+  }
+
+  .language-btn {
+    display: flex;
+    align-items: center;
+    gap: vars.$spacing-xs;
+    padding: vars.$spacing-xs vars.$spacing-sm;
+    background: transparent;
+    border: 1px solid map.get(vars.$colors, 'border-light');
+    border-radius: vars.$border-radius-md;
+    color: map.get(vars.$colors, 'text-secondary');
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+
+    .language-flag {
+      font-size: 1.1rem;
+    }
+
+    .language-name {
+      font-weight: 500;
+    }
+
+    &:hover {
+      background-color: map.get(vars.$colors, 'bg-hover');
+      border-color: map.get(vars.$colors, 'primary');
+      color: map.get(vars.$colors, 'text-primary');
+    }
+
+    &.active {
+      background-color: map.get(vars.$colors, 'primary');
+      border-color: map.get(vars.$colors, 'primary');
+      color: white;
+      
+      .language-flag {
+        filter: brightness(1.2);
+      }
+    }
+
+    // Mobile : boutons plus grands
+    @media (max-width: vars.$breakpoint-sm) {
+      padding: vars.$spacing-sm;
+      
+      .language-name {
+        display: none; // Masquer le texte sur mobile
+      }
+    }
+  }
+
+  // Mode compact
+  &.compact {
+    .language-select {
+      padding: vars.$spacing-xs vars.$spacing-sm;
+      background-color: map.get(vars.$colors, 'bg-secondary');
+      border: 1px solid map.get(vars.$colors, 'border-light');
+      border-radius: vars.$border-radius-md;
+      color: map.get(vars.$colors, 'text-primary');
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: map.get(vars.$colors, 'primary');
+      }
+
+      &:focus {
+        outline: none;
+        border-color: map.get(vars.$colors, 'primary');
+        box-shadow: 0 0 0 2px rgba(255, 59, 59, 0.2);
+      }
+
+      option {
+        background-color: map.get(vars.$colors, 'bg-secondary');
+        color: map.get(vars.$colors, 'text-primary');
+      }
+    }
+  }
+}
+
+// Animation d'apparition
+@keyframes language-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.language-selector {
+  animation: language-fade-in 0.3s ease-out;
+}

@@ -28,6 +28,14 @@ function generateStreamingInfo(anime, country) {
       available: Math.random() > 0.6, // Simulation aléatoire
       url: `https://www.netflix.com/search?q=${encodeURIComponent(title)}`
     },
+    'prime video': {
+      available: Math.random() > 0.7,
+      url: `https://www.primevideo.com/search/ref=atv_nb_sr?query=${encodeURIComponent(title)}`
+    },
+    'disney+': {
+      available: Math.random() > 0.8,
+      url: `https://www.disneyplus.com/search?q=${encodeURIComponent(title)}`
+    },
     funimation: {
       available: country === 'US' && Math.random() > 0.7,
       url: `https://www.funimation.com/search/?q=${encodeURIComponent(title)}`
@@ -39,6 +47,34 @@ function generateStreamingInfo(anime, country) {
     wakanim: {
       available: country === 'FR' && Math.random() > 0.8,
       url: `https://www.wakanim.tv/fr/v2/search?q=${encodeURIComponent(title)}`
+    },
+    hulu: {
+      available: country === 'US' && Math.random() > 0.6,
+      url: `https://www.hulu.com/search?q=${encodeURIComponent(title)}`
+    },
+    'hbo max': {
+      available: country === 'US' && Math.random() > 0.8,
+      url: `https://www.hbomax.com/search?q=${encodeURIComponent(title)}`
+    },
+    'paramount+': {
+      available: Math.random() > 0.9,
+      url: `https://www.paramountplus.com/search?query=${encodeURIComponent(title)}`
+    },
+    'apple tv+': {
+      available: Math.random() > 0.9,
+      url: `https://tv.apple.com/search?term=${encodeURIComponent(title)}`
+    },
+    peacock: {
+      available: country === 'US' && Math.random() > 0.85,
+      url: `https://www.peacocktv.com/search?q=${encodeURIComponent(title)}`
+    },
+    hidive: {
+      available: Math.random() > 0.8,
+      url: `https://www.hidive.com/search?q=${encodeURIComponent(title)}`
+    },
+    aniplus: {
+      available: (country === 'KR' || country === 'JP') && Math.random() > 0.7,
+      url: `https://www.aniplus-asia.com/search?q=${encodeURIComponent(title)}`
     }
   };
 }
@@ -121,6 +157,18 @@ export const useTodayReleases = () => {
         const formattedData = animesArray.map(anime => {
           console.log('📝 Anime individuel:', anime);
           
+          // Générer les infos de streaming
+          const streamingInfo = generateStreamingInfo({ attributes: { titles: { en: anime.title } } }, country);
+          
+          // Convertir streamingInfo en array pour AnimeCard
+          const streamingArray = Object.entries(streamingInfo)
+            .filter(([, info]) => info.available)
+            .map(([platform, info]) => ({
+              name: platform,
+              url: info.url,
+              logo: platform // Le composant PlatformLogo utilisera ce nom
+            }));
+          
           const formattedAnime = {
             mal_id: anime.mal_id,
             title: anime.title || anime.title_english || 'Titre non disponible',
@@ -139,7 +187,11 @@ export const useTodayReleases = () => {
             popularity: anime.popularity || 0,
             status: anime.status,
             episode_count: anime.episodes,
-            streamingInfo: generateStreamingInfo({ attributes: { titles: { en: anime.title } } }, country)
+            episodes: anime.episodes,
+            genres: anime.genres || [],
+            broadcast: anime.broadcast || {},
+            streaming: streamingArray, // Array des plateformes disponibles
+            streamingInfo: streamingInfo // Garde aussi l'objet complet pour compatibilité
           };
           
           console.log('✅ Anime formaté:', formattedAnime);
@@ -205,6 +257,66 @@ export const useStreamingInfo = (animeId, country = 'FR') => {
         country: country
       };
     }
+  });
+};
+
+// 📊 Hook pour récupérer les statistiques globales
+export const useGlobalStats = (country = 'FR') => {
+  return useQuery({
+    queryKey: ['globalStats', country],
+    queryFn: async () => {
+      try {
+        // Appel vers notre backend pour récupérer les statistiques
+        const response = await fetch(buildBackendUrl('/api/anime/stats', { country }));
+        
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('📊 Réponse backend stats:', result);
+        
+        // Le backend retourne soit data.data soit directement data selon l'endpoint
+        const data = result.data || result;
+        
+        return {
+          todayReleases: data.todayReleases || 0,
+          totalAnimes: data.totalAnimes || 0,
+          activeWeek: data.activeWeek || 0, // Animes avec nouveaux épisodes cette semaine
+          totalEpisodes: data.totalEpisodes || 0, // Episodes sortis ce mois
+          apiStatus: data.apiStatus || 'OK', // État de l'API
+          success: data.success !== false // Par défaut true sauf si explicitement false
+        };
+      } catch (error) {
+        console.error('❌ Erreur lors de la récupération des stats:', error);
+        
+        // Fallback avec des données simulées réalistes basées sur le pays
+        const countryMultiplier = {
+          'FR': { base: 1.0, episodes: 850 },
+          'US': { base: 1.3, episodes: 1100 },
+          'JP': { base: 1.5, episodes: 1300 },
+          'UK': { base: 0.9, episodes: 750 },
+          'DE': { base: 0.8, episodes: 680 },
+          'ES': { base: 0.7, episodes: 600 },
+          'IT': { base: 0.6, episodes: 520 }
+        };
+        
+        const multiplier = countryMultiplier[country] || countryMultiplier['FR'];
+        
+        return {
+          todayReleases: Math.floor((Math.random() * 15 + 5) * multiplier.base), // 5-20 animes par jour
+          totalAnimes: Math.floor((1247 + Math.random() * 100) * multiplier.base), // Base + variation
+          activeWeek: Math.floor((Math.random() * 80 + 40) * multiplier.base), // 40-120 animes actifs par semaine  
+          totalEpisodes: Math.floor(multiplier.episodes + Math.random() * 200), // Episodes par mois avec variation
+          apiStatus: 'ERROR', // API en erreur, données de fallback
+          success: false
+        };
+      }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - les stats ne changent pas souvent
+    cacheTime: 30 * 60 * 1000, // 30 minutes en cache
+    refetchOnWindowFocus: false, // Pas besoin de refetch au focus
+    retry: 2
   });
 };
 
