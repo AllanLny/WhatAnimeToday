@@ -77,3 +77,8 @@ application-*.properties
 application-*.yml
 !application.properties
 !application.yml
+
+# Ne pas tracker les properties spécifiques au backend (évite de committer des secrets)
+# On autorise toujours un `application.properties` à la racine si nécessaire via `!application.properties`.
+# Mais on ignore explicitement celui dans le backend.
+/Wat-Backend/src/main/resources/application.properties
