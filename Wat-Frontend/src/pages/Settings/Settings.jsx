@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useUserContext } from '../../context/UserContext';
 import { useWATTranslation, LANGUAGE_NAMES } from '../../hooks/useWATTranslation';
-import LanguageSelector from '../../components/Common/LanguageSelector';
+import { LanguageSelector } from '../../components/Common';
 import './Settings.scss'; 
 
 function Settings() {

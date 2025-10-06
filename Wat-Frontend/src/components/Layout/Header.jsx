@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import LanguageSelector from '../Common/LanguageSelector';
+import { LanguageSelector } from '../Common';
 import { useWATTranslation } from '../../hooks/useWATTranslation';
 import './Header.scss';
 

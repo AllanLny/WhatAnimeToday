@@ -1,4 +1,4 @@
-@use '../../variables' as vars;
+@use '../../../../variables' as vars;
 
 // === Modern Anime Card 2025 === //
 
@@ -219,6 +219,44 @@
         }
       }
     }
+
+    .streaming-platforms {
+      display: flex;
+      align-items: center;
+      gap: vars.spacing('xs');
+      margin-bottom: vars.spacing('md');
+      
+      .platform-logo {
+        transition: all 0.2s ease;
+        
+        &:hover {
+          transform: scale(1.15);
+          z-index: 5;
+        }
+      }
+      
+      .more-platforms {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: vars.radius('sm');
+        font-size: vars.font-size('xxs');
+        font-weight: 700;
+        color: vars.color('text-muted');
+        transition: all 0.2s ease;
+        
+        &:hover {
+          background: vars.color('primary');
+          border-color: vars.color('primary');
+          color: white;
+          transform: scale(1.1);
+        }
+      }
+    }
     
     .anime-synopsis {
       font-size: vars.font-size('sm');
@@ -269,71 +307,6 @@
             background: vars.color('primary');
             border-color: vars.color('primary');
             color: white;
-          }
-        }
-      }
-      
-      .streaming-info {
-        display: flex;
-        align-items: center;
-        gap: vars.spacing('sm');
-        flex: 1;
-        justify-content: flex-end;
-        
-        .streaming-label {
-          font-size: vars.font-size('xs');
-          color: vars.color('text-muted');
-          font-weight: 500;
-          white-space: nowrap;
-        }
-        
-        .platforms-list {
-          display: flex;
-          align-items: center;
-          gap: vars.spacing('xs');
-          flex-wrap: wrap;
-          justify-content: flex-end;
-          
-          .platform-logo {
-            transition: all 0.2s ease;
-            
-            &:hover {
-              transform: scale(1.1);
-              z-index: 10;
-            }
-          }
-          
-          .more-platforms {
-            font-size: vars.font-size('xs');
-            color: vars.color('text-muted');
-            font-weight: 600;
-            background: vars.color('bg-hover');
-            padding: vars.spacing('xxs') vars.spacing('xs');
-            border-radius: vars.radius('sm');
-            margin-left: vars.spacing('xxs');
-            border: 1px solid vars.color('border-light');
-            transition: all 0.2s ease;
-            
-            &:hover {
-              background: vars.color('primary');
-              color: white;
-              border-color: vars.color('primary');
-            }
-          }
-        }
-        
-        .available-text {
-          font-size: vars.font-size('xs');
-          color: vars.color('accent-green');
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          gap: vars.spacing('xxs');
-          
-          &::before {
-            content: '●';
-            font-size: 8px;
-            color: vars.color('accent-green');
           }
         }
       }
@@ -391,10 +364,6 @@
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
     border-radius: vars.radius('md');
-  }
-  
-  .anime-title,
-  .anime-synopsis {
     height: 1em;
     margin-bottom: vars.spacing('sm');
   }
@@ -406,5 +375,16 @@
   }
   100% {
     background-position: 200% 0;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

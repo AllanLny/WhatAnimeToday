@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { useWATTranslation, LANGUAGE_NAMES, LANGUAGE_FLAGS } from '../../hooks/useWATTranslation';
+import { useWATTranslation, LANGUAGE_NAMES, LANGUAGE_FLAGS } from '../../../../hooks/useWATTranslation';
 import './LanguageSelector.scss';
 
 const LanguageSelector = ({ className = '', showText = true, compact = false }) => {

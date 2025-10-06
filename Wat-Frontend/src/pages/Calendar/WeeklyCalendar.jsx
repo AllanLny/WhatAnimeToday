@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useUserContext } from '../../context/UserContext';
 import { useWeeklyReleases } from '../../services/api';
-import PlatformLogo from '../../components/Common/PlatformLogo/PlatformLogo';
+import { PlatformLogo } from '../../components/Common';
 import './WeeklyCalendar.scss';
 
 function WeeklyCalendar() {

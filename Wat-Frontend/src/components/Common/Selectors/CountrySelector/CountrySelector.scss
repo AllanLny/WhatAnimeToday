@@ -1,0 +1,48 @@
+@use '../../../../variables' as vars;
+
+.country-select {
+  appearance: none;
+  background: vars.color('bg-secondary');
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: vars.radius('lg');
+  color: vars.color('text-primary');
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: vars.spacing('sm') vars.spacing('lg') vars.spacing('sm') vars.spacing('sm');
+  transition: all 0.2s ease;
+  min-width: 140px;
+  display: inline-block;
+  outline: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+
+  &:hover {
+    border-color: rgba(255, 59, 59, 0.3);
+    background-color: vars.color('bg-hover');
+  }
+
+  &:focus {
+    outline: none;
+    border-color: vars.color('primary');
+    box-shadow: 0 0 0 3px rgba(255, 59, 59, 0.1);
+  }
+
+  option {
+    background-color: vars.color('bg-secondary');
+    color: vars.color('text-primary');
+    padding: vars.spacing('sm');
+    border: none;
+  }
+
+  // Mode compact
+  &.compact {
+    min-width: 120px;
+    font-size: 0.8rem;
+    padding: vars.spacing('xs') vars.spacing('md') vars.spacing('xs') vars.spacing('xs');
+    background-size: 14px;
+    background-position: right 8px center;
+  }
+}

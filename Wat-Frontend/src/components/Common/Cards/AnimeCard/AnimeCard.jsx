@@ -1,7 +1,7 @@
 import React from 'react';
 import './AnimeCard.scss';
-import PlatformLogo from './PlatformLogo/PlatformLogo';
-import { useWATTranslation } from '../../hooks/useWATTranslation';
+import { PlatformLogo } from '../../Media';
+import { useWATTranslation } from '../../../../hooks/useWATTranslation';
 
 const AnimeCard = ({ 
   anime, 
@@ -137,6 +137,24 @@ const AnimeCard = ({
           </div>
         )}
 
+        {/* Streaming Info - Positioned after genres */}
+        {streaming.length > 0 && (
+          <div className="streaming-platforms">
+            {streaming.slice(0, 4).map((platform, index) => (
+              <PlatformLogo 
+                key={index}
+                platform={platform.name || platform.logo || platform} 
+                size="small" 
+              />
+            ))}
+            {streaming.length > 4 && (
+              <div className="more-platforms">
+                +{streaming.length - 4}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Synopsis */}
         {synopsis && (
           <p className="anime-synopsis">
@@ -157,26 +175,6 @@ const AnimeCard = ({
               📤
             </button>
           </div>
-
-          {/* Streaming Info */}
-          {streaming.length > 0 && (
-            <div className="streaming-info">
-              <span className="streaming-label">{t('anime.streamingOn', 'Diffusé sur')}:</span>
-              <div className="platforms-list">
-                {streaming.slice(0, 4).map((platform, index) => (
-                  <div key={index} className="platform-logo">
-                    <PlatformLogo 
-                      platform={platform.name || platform.logo || platform} 
-                      size="small" 
-                    />
-                  </div>
-                ))}
-                {streaming.length > 4 && (
-                  <span className="more-platforms">+{streaming.length - 4}</span>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -1,0 +1,112 @@
+@use 'sass:color';
+@use '../../../../variables' as vars;
+
+.platform-logo {
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all vars.$transition-speed vars.$transition-timing;
+  overflow: hidden;
+  position: relative;
+  
+  &.small {
+    width: 24px;
+    height: 24px;
+    font-size: 9px;
+  }
+  
+  &.medium {
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
+  }
+  
+  &.large {
+    width: 40px;
+    height: 40px;
+    font-size: 13px;
+  }
+  
+  .platform-svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 2px;
+    border-radius: 6px;
+  }
+  
+  .platform-text {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: vars.$font-family-title;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, vars.$color-primary, vars.$color-secondary);
+    border-radius: 8px;
+  }
+  
+  &.crunchyroll {
+    background: linear-gradient(135deg, #ff6500, #ff4500);
+  }
+  
+  &.funimation {
+    background: linear-gradient(135deg, #5c2a9d, #8a2be2);
+  }
+  
+  &.netflix {
+    background: linear-gradient(135deg, #e50914, #b20710);
+  }
+  
+  &.hulu {
+    background: linear-gradient(135deg, #1ce783, #00b359);
+  }
+  
+  &.hidive {
+    background: linear-gradient(135deg, #ff1744, #d50000);
+  }
+  
+  &.wakanim {
+    background: linear-gradient(135deg, #00bcd4, #0097a7);
+  }
+  
+  &.aniplus {
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+  }
+  
+  &.adn {
+    background: linear-gradient(135deg, #0066cc, #004499);
+  }
+  
+  &.prime-video {
+    background: linear-gradient(135deg, #00a8e1, #007bb8);
+  }
+  
+  &.disney {
+    background: linear-gradient(135deg, #0063e5, #004db3);
+  }
+  
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    z-index: 10;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

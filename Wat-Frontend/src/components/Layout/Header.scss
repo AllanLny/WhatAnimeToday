@@ -41,45 +41,109 @@
     font-weight: 700;
     color: vars.color('text-primary');
     text-decoration: none;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 
     &:hover {
-      color: vars.color('primary');
       transform: scale(1.05);
+      
+      .logo-icon {
+        filter: drop-shadow(0 0 16px rgba(255, 59, 59, 0.6));
+        transform: rotate(-5deg);
+      }
+      
+      .logo-text {
+        background: linear-gradient(135deg, vars.color('primary-light') 0%, vars.color('primary') 50%, #ff6b6b 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        transform: translateY(-1px);
+      }
     }
 
     .logo-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: vars.radius('lg');
-      transition: all 0.2s ease;
+      width: 44px;
+      height: 44px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      filter: drop-shadow(0 0 8px rgba(255, 59, 59, 0.4));
       
-      // Style pour l'image SVG
-      &[src] {
-        filter: drop-shadow(0 0 8px rgba(255, 59, 59, 0.3));
-        
-        &:hover {
-          filter: drop-shadow(0 0 12px rgba(255, 59, 59, 0.5));
-        }
-      }
+      // Assurer que l'image reste nette
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
       
-      // Fallback pour l'ancien style (au cas où)
-      &:not([src]) {
-        background: linear-gradient(135deg, vars.color('primary') 0%, vars.color('primary-dark') 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        box-shadow: vars.shadow('glow-red');
-      }
+      // Animation de pulsation subtile
+      animation: logoPulse 3s ease-in-out infinite;
     }
 
     .logo-text {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
       background: linear-gradient(135deg, vars.color('primary') 0%, vars.color('primary-light') 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-shadow: 0 0 20px rgba(255, 59, 59, 0.3);
+      
+      // Support pour les navigateurs qui ne supportent pas background-clip
+      @supports not (-webkit-background-clip: text) {
+        color: vars.color('primary');
+      }
+    }
+
+    // Effet de lueur au survol
+    &::before {
+      content: '';
+      position: absolute;
+      top: -5px;
+      left: -5px;
+      right: -5px;
+      bottom: -5px;
+      background: radial-gradient(circle, rgba(255, 59, 59, 0.1) 0%, transparent 70%);
+      border-radius: vars.radius('xl');
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: -1;
+    }
+
+    &:hover::before {
+      opacity: 1;
+    }
+
+    // Adaptations pour mobile
+    @media (max-width: vars.breakpoint('md')) {
+      gap: vars.spacing('xs');
+      
+      .logo-icon {
+        width: 36px;
+        height: 36px;
+      }
+      
+      .logo-text {
+        font-size: 1.25rem;
+      }
+      
+      // Réduire les effets sur mobile pour les performances
+      &:hover {
+        transform: scale(1.02);
+        
+        .logo-icon {
+          transform: none;
+        }
+      }
+    }
+
+    // Version ultra-compacte pour très petits écrans
+    @media (max-width: vars.breakpoint('sm')) {
+      .logo-text {
+        display: none;
+      }
+      
+      .logo-icon {
+        width: 32px;
+        height: 32px;
+      }
     }
   }
 
@@ -328,6 +392,15 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes logoPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(255, 59, 59, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(255, 59, 59, 0.6));
   }
 }
 

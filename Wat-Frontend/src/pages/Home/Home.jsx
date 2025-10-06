@@ -178,15 +178,15 @@ const Home = () => {
                   className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
                   onClick={() => handleViewModeChange('grid')}
                   title={t('ui.gridView', 'Vue grille')}
+                  aria-label={t('ui.gridView', 'Vue grille')}
                 >
-                  ⊞
                 </button>
                 <button 
                   className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
                   onClick={() => handleViewModeChange('list')}
                   title={t('ui.listView', 'Vue liste')}
+                  aria-label={t('ui.listView', 'Vue liste')}
                 >
-                  ☰
                 </button>
               </div>
             </div>

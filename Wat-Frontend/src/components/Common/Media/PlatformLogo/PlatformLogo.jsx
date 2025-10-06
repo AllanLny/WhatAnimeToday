@@ -2,11 +2,11 @@ import React from 'react';
 import './PlatformLogo.scss';
 
 // Import des SVG depuis les assets
-import NetflixLogo from '../../../assets/Netflix_2015_N_logo.svg';
-import CrunchyrollLogo from '../../../assets/Crunchyroll_Logo.svg';
-import ADNLogo from '../../../assets/Logo_Anime-Digital-Network.svg';
-import PrimeVideoLogo from '../../../assets/Amazon_Prime_Video_logo.svg';
-import DisneyPlusLogo from '../../../assets/Disney+_logo.svg';
+import NetflixLogo from '../../../../assets/Netflix_2015_N_logo.svg';
+import CrunchyrollLogo from '../../../../assets/Crunchyroll_Logo.svg';
+import ADNLogo from '../../../../assets/Logo_Anime-Digital-Network.svg';
+import PrimeVideoLogo from '../../../../assets/Amazon_Prime_Video_logo.svg';
+import DisneyPlusLogo from '../../../../assets/Disney+_logo.svg';
 
 // Composant pour afficher le logo d'une plateforme de streaming
 function PlatformLogo({ platform, size = 'medium' }) {

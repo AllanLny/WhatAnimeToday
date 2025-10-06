@@ -3,7 +3,7 @@
  * Utilisé pour tous les messages d'erreur dans l'app
  */
 import './ErrorMessage.scss';
-import { useWATTranslation } from '../../hooks/useWATTranslation';
+import { useWATTranslation } from '../../../../hooks/useWATTranslation';
 
 const ErrorMessage = ({ 
   message = "Une erreur s'est produite", 
