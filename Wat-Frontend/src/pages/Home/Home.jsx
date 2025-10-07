@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import './Home.scss';
-import Header from '../../components/Layout/Header';
-import { AnimeCard, Loading, ErrorMessage, CountrySelector } from '../../components/Common';
+const Header = React.lazy(() => import('../../components/Layout/Header'));
+import { Loading, ErrorMessage, CountrySelector } from '../../components/Common';
+const AnimeCard = React.lazy(() => import('../../components/Common/Cards/AnimeCard/AnimeCard'));
 import { useTodayReleases, useGlobalStats } from '../../services/api';
 import { useUserContext } from '../../context/UserContext';
 import { useWATTranslation } from '../../hooks/useWATTranslation';
@@ -11,7 +12,6 @@ const Home = () => {
   const { t, formatNumber } = useWATTranslation();
   const { country, setCountry } = useUserContext() || { country: 'FR', setCountry: () => {} };
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
-
   // Fetch today's releases using the custom hook
   const { data: animesAujourdhui, isLoading, error, refetch } = useTodayReleases();
   
@@ -97,19 +97,38 @@ const Home = () => {
     return (
       <div className={`anime-grid ${viewMode}-view`}>
         {animesAujourdhui.map((anime) => (
-          <AnimeCard 
-            key={anime.mal_id} 
-            anime={anime} 
-            variant={viewMode === 'list' ? 'list' : 'default'}
-          />
+          <Suspense key={anime.mal_id} fallback={<div style={{width: 220, height: 320}} />}>
+            <AnimeCard 
+              anime={anime} 
+              variant={viewMode === 'list' ? 'list' : 'default'}
+              country={country}
+            />
+          </Suspense>
         ))}
       </div>
     );
   };
 
+  // Prefetch streaming info for the first few items to improve perceived performance
+  useEffect(() => {
+    if (!animesAujourdhui || animesAujourdhui.length === 0) return;
+    import('../../lib/queryClient').then(({ queryClient }) => {
+      const prefetchCount = 3; // reduce initial network work
+      animesAujourdhui.slice(0, prefetchCount).forEach(anime => {
+        const animeId = anime.title || anime.canonicalTitle || anime.mal_id || anime.id || anime.slug;
+        queryClient.prefetchQuery(['animePlatforms', animeId, country], () => fetch(`/api/anime/anime/${encodeURIComponent(animeId)}/platforms?country=${country}`).then(r => r.json()), {
+          staleTime: 1000 * 60 * 60,
+          cacheTime: 1000 * 60 * 60
+        });
+      });
+    }).catch(()=>{});
+  }, [animesAujourdhui, country]);
+
   return (
     <>
-      <Header />
+      <Suspense fallback={<div style={{height: 64}} />}>
+        <Header />
+      </Suspense>
       <main className="home">
         {/* Hero Section */}
         <section className="hero-section">
@@ -173,20 +192,33 @@ const Home = () => {
                 compact={true}
               />
 
-              <div className="view-toggle">
+              <div className={`view-toggle ${viewMode ? 'has-active ' + (viewMode === 'grid' ? 'grid-active' : 'list-active') : ''}`}>
                 <button 
                   className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
                   onClick={() => handleViewModeChange('grid')}
                   title={t('ui.gridView', 'Vue grille')}
                   aria-label={t('ui.gridView', 'Vue grille')}
+                  data-view="grid"
                 >
+                  <svg className="icon icon-grid" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <circle cx="4" cy="4" r="2" fill="currentColor" />
+                    <circle cx="12" cy="4" r="2" fill="currentColor" />
+                    <circle cx="4" cy="12" r="2" fill="currentColor" />
+                    <circle cx="12" cy="12" r="2" fill="currentColor" />
+                  </svg>
                 </button>
                 <button 
                   className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
                   onClick={() => handleViewModeChange('list')}
                   title={t('ui.listView', 'Vue liste')}
                   aria-label={t('ui.listView', 'Vue liste')}
+                  data-view="list"
                 >
+                  <svg className="icon icon-list" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor" />
+                    <rect x="2" y="7" width="12" height="2" rx="1" fill="currentColor" />
+                    <rect x="2" y="11" width="12" height="2" rx="1" fill="currentColor" />
+                  </svg>
                 </button>
               </div>
             </div>

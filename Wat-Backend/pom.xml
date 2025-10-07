@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.18</version>
+        <version>3.5.6</version>
         <relativePath/>
     </parent>
     <groupId>fr.wat</groupId>
@@ -15,7 +15,9 @@
     <description>Backend Spring Boot pour What Anime Today</description>
     
     <properties>
-        <java.version>11</java.version>
+        <java.version>21</java.version>
+        <!-- Ensure consistent encoding -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     
     <dependencies>
@@ -57,6 +59,15 @@
     
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <release>${java.version}</release>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

@@ -11,11 +11,14 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import org.springframework.core.env.Environment;
 
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 @Service
 public class AnimeDataService {
@@ -25,17 +28,47 @@ public class AnimeDataService {
     private final WebClient tmdbClient;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;
+    private final String tmdbApiKey;
     
     public AnimeDataService(
             @Qualifier("kitsuClient") WebClient kitsuClient,
             @Qualifier("jikanClient") WebClient jikanClient,
             @Qualifier("tmdbClient") WebClient tmdbClient,
+            Environment env,
             CacheManager cacheManager) {
         this.kitsuClient = kitsuClient;
         this.jikanClient = jikanClient;
         this.tmdbClient = tmdbClient;
         this.objectMapper = new ObjectMapper();
         this.cacheManager = cacheManager;
+        // Prefer environment variable TMDB_API_KEY, fallback to application property tmdb.api.key
+        String fromEnv = env.getProperty("TMDB_API_KEY");
+        String fromProps = env.getProperty("tmdb.api.key");
+        this.tmdbApiKey = (fromEnv != null && !fromEnv.isBlank()) ? fromEnv : fromProps;
+        if (this.tmdbApiKey == null || this.tmdbApiKey.isBlank()) {
+            System.err.println("⚠️ TMDB API key not set. Define TMDB_API_KEY env var or tmdb.api.key in application.properties to enable provider lookup.");
+        }
+    }
+
+    /**
+     * Recherche Kitsu par titre et retourne le JsonNode brut (ou null)
+     */
+    public com.fasterxml.jackson.databind.JsonNode searchKitsuByTitle(String title) {
+        try {
+            String resp = kitsuClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/anime")
+                            .queryParam("filter[text]", title)
+                            .queryParam("page[limit]", 3)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+            if (resp == null) return null;
+            return objectMapper.readTree(resp);
+        } catch (Exception e) {
+            System.err.println("❌ Kitsu search error for title='" + title + "': " + e.getMessage());
+            return null;
+        }
     }
     
     /**
@@ -154,49 +187,60 @@ public class AnimeDataService {
         try {
             // Obtenir le jour actuel et utiliser l'endpoint spécialisé
             String todayDay = LocalDate.now().getDayOfWeek().name().toLowerCase();
-            String url = "/schedules/" + todayDay;
-            
-            System.out.println("🌐 API Call Jikan: " + url + " pour " + country + " (jour: " + todayDay + ")");
-            
-            Mono<JsonNode> response = jikanClient
-                .get()
-                .uri(url)
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .timeout(Duration.ofSeconds(10));
-            
-            JsonNode result = response.block();
-            
-            if (result != null && result.has("data")) {
-                ArrayNode filteredData = objectMapper.createArrayNode();
-                JsonNode animes = result.get("data");
-                
-                System.out.println("📊 " + animes.size() + " animes trouvés pour " + todayDay);
-                
-                if (animes.isArray()) {
+            // Jikan peut paginer les résultats. Itérer toutes les pages pour récupérer la totalité des animes du jour.
+            ArrayNode filteredData = objectMapper.createArrayNode();
+            int page = 1;
+            int lastPage = 1;
+            int totalFetched = 0;
+
+            do {
+                String url = "/schedules/" + todayDay + "?page=" + page;
+                System.out.println("🌐 API Call Jikan: " + url + " pour " + country + " (jour: " + todayDay + ")");
+
+                Mono<JsonNode> response = jikanClient
+                        .get()
+                        .uri(url)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .timeout(Duration.ofSeconds(10));
+
+                JsonNode result = response.block();
+                if (result == null) break;
+
+                // Extraire les données
+                if (result.has("data") && result.get("data").isArray()) {
+                    JsonNode animes = result.get("data");
+                    System.out.println("📊 page=" + page + " -> " + animes.size() + " animes trouvés");
                     for (JsonNode anime : animes) {
-                        // Ajouter le pays à chaque anime
-                        ((ObjectNode) anime).put("country", country);
-                        filteredData.add(anime);
-                        
-                        // Log pour debug
-                        if (anime.has("title")) {
-                            System.out.println("✅ " + anime.get("title").asText());
-                        }
+                        try {
+                            // Conserver les images (webp/jpg) fournis par Jikan et ajouter le pays
+                            ((ObjectNode) anime).put("country", country);
+                            filteredData.add(anime);
+                            totalFetched++;
+                            if (anime.has("title")) System.out.println("✅ " + anime.get("title").asText());
+                        } catch (Exception ignored) {}
                     }
                 }
-                
-                ObjectNode finalResult = objectMapper.createObjectNode();
-                finalResult.set("data", filteredData);
-                finalResult.put("country", country);
-                finalResult.put("day", todayDay);
-                finalResult.put("total", filteredData.size());
-                
-                return finalResult;
-            }
-            
-            return objectMapper.createObjectNode();
-            
+
+                // Pagination
+                if (result.has("pagination") && result.get("pagination").has("last_visible_page")) {
+                    lastPage = result.get("pagination").get("last_visible_page").asInt(1);
+                } else {
+                    lastPage = page; // stop if pagination absent
+                }
+
+                page++;
+                // Respecter une petite pause entre pages
+                if (page <= lastPage) Thread.sleep(150);
+            } while (page <= lastPage);
+
+            ObjectNode finalResult = objectMapper.createObjectNode();
+            finalResult.set("data", filteredData);
+            finalResult.put("country", country);
+            finalResult.put("day", todayDay);
+            finalResult.put("total", totalFetched);
+
+            return finalResult;
         } catch (Exception e) {
             System.err.println("❌ Erreur API Jikan pour " + country + ": " + e.getMessage());
             throw new RuntimeException("Erreur lors de l'appel API Jikan pour " + country, e);
@@ -390,26 +434,261 @@ public class AnimeDataService {
     /**
      * Récupérer les plateformes de streaming pour un anime spécifique
      */
-    @Cacheable(value = "animeDetails", key = "'platforms_' + #animeId")
-    public JsonNode getStreamingPlatforms(String animeId) {
+    @Cacheable(value = "animeDetails", key = "'platforms_' + #animeId + '_' + #country")
+    public JsonNode getStreamingPlatforms(String animeId, String country) {
         try {
-            // Utiliser Kitsu pour récupérer les informations de streaming
-            String response = kitsuClient.get()
-                    .uri("/anime/{id}/streaming-links", animeId)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-            
-            return objectMapper.readTree(response);
-            
+            // 1) Récupérer le titre via Kitsu (fallback si nécessaire)
+            String kitsuResp = null;
+            // Si l'identifiant fourni est numérique, tenter /anime/{id}, sinon considérer que c'est un titre/slug et faire une recherche
+            if (animeId != null && animeId.matches("^\\d+$")) {
+                try {
+                    kitsuResp = kitsuClient.get()
+                            .uri("/anime/{id}", animeId)
+                            .retrieve()
+                            .bodyToMono(String.class)
+                            .block();
+                } catch (Exception e) {
+                    // Si l'id direct ne fonctionne pas, tenter une recherche Kitsu par texte
+                    System.err.println("⚠️ Kitsu /anime/{id} failed for '" + animeId + "' -> trying search fallback");
+                    try {
+                        String searchResp = kitsuClient.get()
+                                .uri(uriBuilder -> uriBuilder.path("/anime")
+                                        .queryParam("filter[text]", animeId)
+                                        .queryParam("page[limit]", 1)
+                                        .build())
+                                .retrieve()
+                                .bodyToMono(String.class)
+                                .block();
+                        kitsuResp = searchResp;
+                    } catch (Exception ex) {
+                        System.err.println("❌ Kitsu fallback search failed: " + ex.getMessage());
+                    }
+                }
+            } else {
+                // L'identifiant n'est pas numérique: le traiter comme un titre et faire une recherche immédiatement
+                try {
+                    String searchResp = kitsuClient.get()
+                            .uri(uriBuilder -> uriBuilder.path("/anime")
+                                    .queryParam("filter[text]", animeId)
+                                    .queryParam("page[limit]", 1)
+                                    .build())
+                            .retrieve()
+                            .bodyToMono(String.class)
+                            .block();
+                    kitsuResp = searchResp;
+                } catch (Exception ex) {
+                    System.err.println("❌ Kitsu search failed for title '" + animeId + "': " + ex.getMessage());
+                }
+            }
+
+            String title = null;
+            if (kitsuResp != null) {
+                JsonNode kitsuJson = objectMapper.readTree(kitsuResp);
+                if (kitsuJson.has("data") && kitsuJson.get("data").has("attributes")) {
+                    JsonNode attrs = kitsuJson.get("data").get("attributes");
+                    if (attrs.has("titles") && attrs.get("titles").has("en")) {
+                        title = attrs.get("titles").get("en").asText();
+                    } else if (attrs.has("canonicalTitle")) {
+                        title = attrs.get("canonicalTitle").asText();
+                    }
+                }
+            }
+
+            if (title == null || title.isBlank()) {
+                // Tenter d'extraire un mal_id ou slug depuis la réponse Kitsu si possible
+                try {
+                    if (kitsuResp != null) {
+                        JsonNode kitsuJson2 = objectMapper.readTree(kitsuResp);
+                        if (kitsuJson2.has("data") && kitsuJson2.get("data").isArray() && kitsuJson2.get("data").size() > 0) {
+                            JsonNode first = kitsuJson2.get("data").get(0).get("attributes");
+                            if (first != null && first.has("canonicalTitle")) {
+                                title = first.get("canonicalTitle").asText();
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+
+                if (title == null || title.isBlank()) {
+                    // Fallback minimal: utiliser l'animeId comme titre pour éviter NullPointer
+                    title = animeId;
+                }
+            }
+
+            // 2) Rechercher sur TMDB (multi-type: tv / movie) pour obtenir un TMDB id
+            // Rendre le titre final/effectively final pour utilisation sûre dans les lambdas
+            final String queryTitle = title;
+            var tmdbResult = searchTmdbForTitle(queryTitle);
+            System.out.println("🔎 TMDB search for title='" + queryTitle + "' returned: " + (tmdbResult != null ? tmdbResult.toString().substring(0, Math.min(200, tmdbResult.toString().length())) : "null"));
+
+            // 3) Si on a un TMDB id, récupérer les watch/providers
+            ObjectNode finalResult = objectMapper.createObjectNode();
+            ArrayNode providersArray = objectMapper.createArrayNode();
+            // set to deduplicate providers per (normalized_name + country)
+            Set<String> seenProviders = new HashSet<>();
+
+            if (tmdbResult != null && tmdbResult.has("id")) {
+                String tmdbId = tmdbResult.get("id").asText();
+                String mediaType = tmdbResult.has("media_type") ? tmdbResult.get("media_type").asText() : "tv";
+
+                JsonNode providers = fetchTmdbWatchProviders(tmdbId, mediaType);
+                System.out.println("📦 TMDB providers for id=" + tmdbId + " mediaType=" + mediaType + " -> " + (providers == null ? "null" : (providers.has("results") ? "results present" : "no results field")));
+
+                // Normaliser la structure pour le frontend: [{"provider_name":"Netflix","provider_id":8,"country":"FR","link":"..."}, ...]
+                if (providers != null && providers.has("results")) {
+                    var results = providers.get("results");
+                    results.fieldNames().forEachRemaining(countryCode -> {
+                        JsonNode countryNode = results.get(countryCode);
+                        if (countryNode == null) return;
+                        // providers: flatrate/free/buy/rent
+                        String[] keys = new String[]{"flatrate", "free", "buy", "rent"};
+                        for (String k : keys) {
+                            if (countryNode.has(k) && countryNode.get(k).isArray()) {
+                                for (JsonNode p : countryNode.get(k)) {
+                                    ObjectNode node = objectMapper.createObjectNode();
+                                    node.put("provider_name", p.has("provider_name") ? p.get("provider_name").asText() : "");
+                                    node.put("provider_id", p.has("provider_id") ? p.get("provider_id").asInt() : -1);
+                                    node.put("display_priority", p.has("logo_path") ? 1 : 0);
+                                    node.put("country", countryCode);
+                                    // Si un pays a été demandé, ne garder que les providers pour ce pays
+                                    if (country != null && !country.isBlank()) {
+                                        if (!countryCode.equalsIgnoreCase(country)) {
+                                            continue;
+                                        }
+                                    }
+                                    node.put("type", k);
+                                    // Lien générique vers TMDB provider page
+                                    String link = "https://www.themoviedb.org/provider/" + (p.has("provider_id") ? p.get("provider_id").asText() : "");
+                                    node.put("link", link);
+                                    // Ajouter version normalisée du nom pour correspondance avec frontend
+                                    String rawName = p.has("provider_name") ? p.get("provider_name").asText() : "";
+                                    String normalized = normalizeProviderName(rawName);
+                                    node.put("normalized_name", normalized);
+
+                                    String dedupeKey = (normalized == null ? "" : normalized.toLowerCase()) + "|" + countryCode.toUpperCase();
+                                    if (seenProviders.contains(dedupeKey)) {
+                                        System.out.println("⚠️ Duplicate provider skipped: " + normalized + " for country " + countryCode + " (title='" + queryTitle + "')");
+                                        continue;
+                                    }
+
+                                    // log each provider added for debug
+                                    System.out.println("➕ Adding provider: " + rawName + " (normalized=" + normalized + ") id=" + (p.has("provider_id") ? p.get("provider_id").asText() : "-") + " country=" + countryCode + " type=" + k + " (title='" + queryTitle + "')");
+
+                                    providersArray.add(node);
+                                    seenProviders.add(dedupeKey);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            finalResult.set("data", providersArray);
+            finalResult.put("query_title", title);
+            finalResult.put("source", "tmdb_kitsu");
+
+            // Summary logging
+            System.out.println("🔔 Providers collected: " + providersArray.size() + " for title='" + queryTitle + "' (country filter='" + (country == null ? "" : country) + "')");
+            if (providersArray.size() == 0) {
+                System.out.println("⚠️ No providers found for title='" + queryTitle + "' (tmdbResult=" + (tmdbResult == null ? "null" : tmdbResult.toString()) + ")");
+            }
+            // exposer le titre utilisé
+            finalResult.put("query_title", queryTitle);
+            return finalResult;
+
         } catch (Exception e) {
             System.err.println("❌ Impossible de récupérer les plateformes pour " + animeId + ": " + e.getMessage());
-            
-            // Retourner une structure vide en cas d'erreur
             var emptyResult = objectMapper.createObjectNode();
             emptyResult.set("data", objectMapper.createArrayNode());
             return emptyResult;
         }
+    }
+
+    /**
+     * Recherche TMDB par titre (préférence TV puis movie)
+     */
+    private JsonNode searchTmdbForTitle(String title) {
+        try {
+            // Chercher sur l'endpoint multi: recherche multi (tv + movie)
+        if (this.tmdbApiKey == null || this.tmdbApiKey.isBlank()) {
+        System.err.println("⚠️ TMDB API key missing - skipping TMDB search for title: " + title);
+        return null;
+        }
+
+        String resp = tmdbClient.get()
+            .uri(uriBuilder -> uriBuilder.path("/search/multi")
+                .queryParam("api_key", this.tmdbApiKey)
+                .queryParam("query", title)
+                .queryParam("language", "fr-FR")
+                .queryParam("page", 1)
+                .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            if (resp == null) return null;
+            JsonNode searchJson = objectMapper.readTree(resp);
+            if (searchJson.has("results") && searchJson.get("results").isArray() && searchJson.get("results").size() > 0) {
+                // Preferer les types "tv" si disponibles
+                for (JsonNode r : searchJson.get("results")) {
+                    if (r.has("media_type") && "tv".equals(r.get("media_type").asText())) {
+                        return r;
+                    }
+                }
+                // Sinon retourner le premier
+                return searchJson.get("results").get(0);
+            }
+
+            return null;
+        } catch (Exception e) {
+            System.err.println("❌ Erreur recherche TMDB pour: " + title + " -> " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Récupère les watch/providers depuis TMDB pour un media id
+     */
+    private JsonNode fetchTmdbWatchProviders(String tmdbId, String mediaType) {
+        try {
+            String path = "/" + ("movie".equals(mediaType) ? "movie" : "tv") + "/" + tmdbId + "/watch/providers";
+        if (this.tmdbApiKey == null || this.tmdbApiKey.isBlank()) {
+        System.err.println("⚠️ TMDB API key missing - skipping fetchTmdbWatchProviders for id: " + tmdbId);
+        return null;
+        }
+
+        String resp = tmdbClient.get()
+            .uri(uriBuilder -> uriBuilder.path(path)
+                .queryParam("api_key", this.tmdbApiKey)
+                .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            if (resp == null) return null;
+            return objectMapper.readTree(resp);
+        } catch (Exception e) {
+            System.err.println("❌ Erreur TMDB watch/providers: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Normalise un nom de provider pour correspondre aux clefs frontend (ex: "Disney Plus" -> "Disney+", "HBO Max" -> "HBO Max")
+     */
+    private String normalizeProviderName(String raw) {
+        if (raw == null) return "";
+        String r = raw.trim().toLowerCase();
+        if (r.contains("netflix")) return "Netflix";
+        if (r.contains("crunchy")) return "Crunchyroll";
+        if (r.contains("funimation")) return "Funimation";
+        if (r.contains("hulu")) return "Hulu";
+        if (r.contains("prime") || r.contains("amazon")) return "Prime Video";
+        if (r.contains("disney")) return "Disney+";
+        if (r.contains("adn") || r.contains("anime-digital-network")) return "ADN";
+        if (r.contains("hidive")) return "HiDive";
+        if (r.contains("hbo")) return "HBO Max";
+        if (r.contains("paramount")) return "Paramount+";
+        // Fallback: capitaliser
+        return raw.trim();
     }
     
     /**

@@ -2,107 +2,84 @@ import React from 'react';
 import './PlatformLogo.scss';
 
 // Import des SVG depuis les assets
-import NetflixLogo from '../../../../assets/Netflix_2015_N_logo.svg';
-import CrunchyrollLogo from '../../../../assets/Crunchyroll_Logo.svg';
-import ADNLogo from '../../../../assets/Logo_Anime-Digital-Network.svg';
-import PrimeVideoLogo from '../../../../assets/Amazon_Prime_Video_logo.svg';
-import DisneyPlusLogo from '../../../../assets/Disney+_logo.svg';
+// Charger dynamiquement tous les assets du dossier `src/assets`
+// Utiliser import.meta.glob avec { eager: true } (compatible avec Vite et certains environnements)
+const logoModules = import.meta.glob('/src/assets/*.{svg,png,webp}', { eager: true });
+
+// Construire une map normalisée { 'netflix': '/src/assets/Netflix_2015_N_logo.svg', ... }
+const logosMap = {};
+Object.entries(logoModules).forEach(([path, mod]) => {
+  const filename = path.split('/').pop(); // e.g. 'Netflix_2015_N_logo.svg'
+  let name = filename.replace(/\.(svg|png|webp)$/i, '');
+  // retirer préfixes communs
+  name = name.replace(/^cdnlogo\.com_/, '');
+  // certains fichiers contiennent suffixes comme .wine in the name
+  name = name.replace(/\.wine$/i, '');
+  // normaliser caractères
+  name = name.replace(/[_\-.]/g, ' ');
+  name = name.replace(/logo/ig, '');
+  name = name.replace(/seeklogo/ig, '');
+  name = name.replace(/icon/ig, '');
+  name = name.replace(/\d+/g, '');
+  name = name.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const resolved = mod?.default || mod;
+  if (!resolved) return;
+
+  // clé principale
+  logosMap[name] = resolved;
+
+  // alias utiles
+  if (name.includes('amazon') && name.includes('prime')) logosMap['prime video'] = resolved;
+  if (name === 'paramount' || name.includes('paramount')) logosMap['paramount+'] = resolved;
+  if (name === 'disney' || name.includes('disney')) {
+    logosMap['disney plus'] = resolved;
+    logosMap['disney+'] = resolved;
+  }
+  if (name === 'hbo' || name.includes('hbo')) logosMap['hbo max'] = resolved;
+  if (name === 'hidive') logosMap['hidive'] = resolved;
+  if (name === 'funimation') logosMap['funimation'] = resolved;
+  if (name === 'hulu') logosMap['hulu'] = resolved;
+});
 
 // Composant pour afficher le logo d'une plateforme de streaming
 function PlatformLogo({ platform, size = 'medium' }) {
+  // Normalise le nom de la plateforme pour gérer variantes et alias
+  const normalizePlatform = (name = '') => {
+    const n = name.toString().trim().toLowerCase();
+    // enlever signes et espaces courants
+    const compact = n.replace(/\s+/g, ' ').replace(/\+/g, 'plus').replace(/[-_]/g, ' ');
+    // quelques alias connus
+    const aliases = {
+      'disney plus': 'disney plus',
+      'disney+': 'disney plus',
+      'hbo max': 'hbo max',
+      'hbomax': 'hbo max',
+      'paramount+': 'paramount+',
+      'paramount plus': 'paramount+',
+      'apple tv+': 'apple tv+',
+      'appletvplus': 'apple tv+',
+      'prime video': 'prime video',
+      'primevideo': 'prime video',
+      'hi dive': 'hidive',
+      'hi-dive': 'hidive'
+    };
+
+    return aliases[compact] || compact;
+  };
+
   // Map des plateformes vers leurs logos
   const renderPlatformLogo = (platform) => {
-    const normalizedPlatform = platform.toLowerCase();
+    const normalizedPlatform = normalizePlatform(platform);
     
+    // si un logo existe pour cette plateforme (dynamique), le rendre
+    if (logosMap[normalizedPlatform]) {
+      return (
+        <img src={logosMap[normalizedPlatform]} alt={platform} className="platform-svg" />
+      );
+    }
+
     switch(normalizedPlatform) {
-      case 'netflix':
-        return (
-          <img 
-            src={NetflixLogo} 
-            alt="Netflix"
-            className="platform-svg"
-          />
-        );
-
-      case 'crunchyroll':
-        return (
-          <img 
-            src={CrunchyrollLogo} 
-            alt="Crunchyroll"
-            className="platform-svg"
-          />
-        );
-
-      case 'adn':
-        return (
-          <img 
-            src={ADNLogo} 
-            alt="Anime Digital Network"
-            className="platform-svg"
-          />
-        );
-
-      case 'prime video':
-        return (
-          <img 
-            src={PrimeVideoLogo} 
-            alt="Amazon Prime Video"
-            className="platform-svg"
-          />
-        );
-
-      case 'disney+':
-        return (
-          <img 
-            src={DisneyPlusLogo} 
-            alt="Disney+"
-            className="platform-svg"
-          />
-        );
-
-      // Pour les plateformes sans SVG, utiliser des initiales stylées
-      case 'funimation':
-        return (
-          <div className="platform-text" style={{ backgroundColor: '#5c2a9d', color: 'white' }}>
-            FUN
-          </div>
-        );
-
-      case 'wakanim':
-        return (
-          <div className="platform-text" style={{ backgroundColor: '#00bcd4', color: 'white' }}>
-            WAK
-          </div>
-        );
-
-      case 'hulu':
-        return (
-          <div className="platform-text" style={{ backgroundColor: '#1ce783', color: 'white' }}>
-            HULU
-          </div>
-        );
-
-      case 'hidive':
-        return (
-          <div className="platform-text" style={{ backgroundColor: '#ff1744', color: 'white' }}>
-            HiDive
-          </div>
-        );
-
-      case 'hbo max':
-        return (
-          <div className="platform-text" style={{ backgroundColor: '#702f8a', color: 'white' }}>
-            HBO
-          </div>
-        );
-
-      case 'paramount+':
-        return (
-          <div className="platform-text" style={{ backgroundColor: '#0064ff', color: 'white' }}>
-            P+
-          </div>
-        );
-
       case 'apple tv+':
         return (
           <div className="platform-text" style={{ backgroundColor: '#000000', color: 'white' }}>

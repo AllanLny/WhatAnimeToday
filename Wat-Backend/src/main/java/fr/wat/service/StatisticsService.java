@@ -69,6 +69,163 @@ public class StatisticsService {
             return 8; // Fallback réaliste
         }
     }
+
+    /**
+     * Compare les sources Jikan vs Kitsu pour les sorties du jour.
+     * Retourne un objet simple contenant : listJikan, listKitsu, onlyInJikan, onlyInKitsu
+     */
+    public java.util.Map<String, Object> compareTodaySources(String country) {
+        java.util.Map<String, Object> report = new java.util.HashMap<>();
+        try {
+            // Récupérer depuis Jikan (via AnimeDataService)
+            var jikanJson = animeDataService.getTodayReleases(country);
+            java.util.List<String> jikanTitles = new java.util.ArrayList<>();
+            // getTodayReleases retourne souvent un ObjectNode contenant un champ "data" (Array)
+            com.fasterxml.jackson.databind.JsonNode animesNode = null;
+            if (jikanJson != null) {
+                if (jikanJson.isArray()) {
+                    animesNode = jikanJson;
+                } else if (jikanJson.has("data") && jikanJson.get("data").isArray()) {
+                    animesNode = jikanJson.get("data");
+                }
+            }
+
+            if (animesNode != null && animesNode.isArray()) {
+                animesNode.forEach(n -> {
+                    try {
+                        // Jikan: champ "title" généralement présent
+                        if (n.has("title")) jikanTitles.add(n.get("title").asText());
+                        // Kitsu-like fallback inside attributes
+                        else if (n.has("attributes") && n.get("attributes").has("canonicalTitle")) jikanTitles.add(n.get("attributes").get("canonicalTitle").asText());
+                        else if (n.has("canonicalTitle")) jikanTitles.add(n.get("canonicalTitle").asText());
+                        else if (n.has("mal_id")) jikanTitles.add("mal:" + n.get("mal_id").asText());
+                    } catch (Exception ignored) {}
+                });
+            }
+
+            // Récupérer depuis Kitsu via recherche par jour (recherche textuelle pour chaque titre)
+            java.util.List<String> kitsuTitles = new java.util.ArrayList<>();
+            for (String t : jikanTitles) {
+                try {
+                    var kitsuResp = animeDataService.searchKitsuByTitle(t);
+                    if (kitsuResp != null && kitsuResp.has("data")) {
+                        var dataNode = kitsuResp.get("data");
+                        if (dataNode.isArray() && dataNode.size() > 0) {
+                            var first = dataNode.get(0).get("attributes");
+                            if (first != null && first.has("canonicalTitle")) kitsuTitles.add(first.get("canonicalTitle").asText());
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // Normalize titles (strip accents, punctuation) and prepare for fuzzy matching
+            java.util.List<String> normJList = new java.util.ArrayList<>();
+            java.util.List<String> normKList = new java.util.ArrayList<>();
+            for (String s : jikanTitles) normJList.add(s == null ? "" : normalizeTitle(s));
+            for (String s : kitsuTitles) normKList.add(s == null ? "" : normalizeTitle(s));
+
+            // Build maps from normalized->original for reporting
+            java.util.Map<String, String> normJToOrig = new java.util.HashMap<>();
+            java.util.Map<String, String> normKToOrig = new java.util.HashMap<>();
+            for (int i = 0; i < jikanTitles.size(); i++) normJToOrig.put(normJList.get(i), jikanTitles.get(i));
+            for (int i = 0; i < kitsuTitles.size(); i++) normKToOrig.put(normKList.get(i), kitsuTitles.get(i));
+
+            // Matched sets
+            java.util.Set<String> matchedK = new java.util.HashSet<>();
+            java.util.Set<String> matchedJ = new java.util.HashSet<>();
+
+            // Exact matches first
+            for (String nj : normJList) {
+                if (nj.isBlank()) continue;
+                if (normKList.contains(nj)) {
+                    matchedJ.add(nj);
+                    matchedK.add(nj);
+                }
+            }
+
+            // Fuzzy matching for remaining items (Levenshtein distance)
+            for (String nj : normJList) {
+                if (nj.isBlank() || matchedJ.contains(nj)) continue;
+                String bestK = null;
+                int bestDist = Integer.MAX_VALUE;
+                for (String nk : normKList) {
+                    if (matchedK.contains(nk)) continue;
+                    int d = levenshtein(nj, nk);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestK = nk;
+                    }
+                }
+                // Accept match if distance small relative to length (or <=2)
+                if (bestK != null) {
+                    int maxLen = Math.max(nj.length(), bestK.length());
+                    double ratio = maxLen == 0 ? 1.0 : 1.0 - ((double) bestDist / (double) maxLen);
+                    if (bestDist <= 2 || ratio >= 0.8) {
+                        matchedJ.add(nj);
+                        matchedK.add(bestK);
+                        System.out.println("🔗 Fuzzy match: '" + normJToOrig.get(nj) + "' <-> '" + normKToOrig.get(bestK) + "' (dist=" + bestDist + ", ratio=" + String.format("%.2f", ratio) + ")");
+                    }
+                }
+            }
+
+            // Compute only-in sets
+            java.util.Set<String> onlyInJikan = new java.util.HashSet<>();
+            for (String nj : normJList) if (!matchedJ.contains(nj)) onlyInJikan.add(nj);
+            java.util.Set<String> onlyInKitsu = new java.util.HashSet<>();
+            for (String nk : normKList) if (!matchedK.contains(nk)) onlyInKitsu.add(nk);
+
+            // Convert normalized sets back to representative original titles for readability
+            java.util.List<String> onlyInJikanOrig = new java.util.ArrayList<>();
+            for (String nj : onlyInJikan) onlyInJikanOrig.add(normJToOrig.getOrDefault(nj, nj));
+            java.util.List<String> onlyInKitsuOrig = new java.util.ArrayList<>();
+            for (String nk : onlyInKitsu) onlyInKitsuOrig.add(normKToOrig.getOrDefault(nk, nk));
+
+            report.put("jikan_count", jikanTitles.size());
+            report.put("kitsu_count", kitsuTitles.size());
+            report.put("onlyInJikan", onlyInJikanOrig);
+            report.put("onlyInKitsu", onlyInKitsuOrig);
+            report.put("jikan_list_sample", jikanTitles.size() > 0 ? jikanTitles.subList(0, Math.min(10, jikanTitles.size())) : java.util.List.of());
+            report.put("kitsu_list_sample", kitsuTitles.size() > 0 ? kitsuTitles.subList(0, Math.min(10, kitsuTitles.size())) : java.util.List.of());
+
+        } catch (Exception e) {
+            report.put("error", e.getMessage());
+        }
+        return report;
+    }
+
+    // Helper: normalize titles (strip accents, punctuation, collapse spaces)
+    private static String normalizeTitle(String s) {
+        if (s == null) return "";
+        String n = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
+        n = n.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        n = n.toLowerCase();
+        // keep letters and numbers and spaces
+        n = n.replaceAll("[^a-z0-9 ]", " ");
+        n = n.replaceAll("\\s+", " ");
+        return n.trim();
+    }
+
+    // Helper: Levenshtein distance (iterative DP)
+    private static int levenshtein(String a, String b) {
+        if (a == null) a = "";
+        if (b == null) b = "";
+        int n = a.length();
+        int m = b.length();
+        if (n == 0) return m;
+        if (m == 0) return n;
+        int[] prev = new int[m + 1];
+        int[] cur = new int[m + 1];
+        for (int j = 0; j <= m; j++) prev[j] = j;
+        for (int i = 1; i <= n; i++) {
+            cur[0] = i;
+            for (int j = 1; j <= m; j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] tmp = prev; prev = cur; cur = tmp;
+        }
+        return prev[m];
+    }
     
     /**
      * 📈 Calcule les animes actifs cette semaine par pays

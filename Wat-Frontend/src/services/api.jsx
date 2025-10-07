@@ -2,85 +2,33 @@ import { useQuery } from '@tanstack/react-query';
 import { useUserContext } from '../context/UserContext';
 
 // Configuration de l'API backend
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+// Par défaut utiliser des URL relatives pour profiter du proxy Vite (/api -> backend)
+// Si VITE_BACKEND_URL est défini, l'utiliser (utile en production ou debug)
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 // Fonction auxiliaire pour construire les URLs du backend
 function buildBackendUrl(endpoint, params = {}) {
-  const url = new URL(`${BACKEND_URL}${endpoint}`);
+  // If BACKEND_URL is empty, use relative path so Vite dev server proxy handles it
+  const base = BACKEND_URL || window.location.origin;
+  const url = new URL(`${base}${endpoint}`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
       url.searchParams.append(key, value);
     }
   });
+  // If BACKEND_URL was empty, return the relative path instead of absolute origin to let Vite proxy work
+  if (!BACKEND_URL) {
+    const relative = endpoint + (Object.keys(params).length ? `?${url.searchParams.toString()}` : '');
+    return relative;
+  }
   return url.toString();
 }
 
 // Fonction helper pour générer les informations de streaming
-function generateStreamingInfo(anime, country) {
-  const title = anime.attributes?.titles?.en || anime.title || 'Unknown';
-  
-  return {
-    crunchyroll: {
-      available: true, // Crunchyroll a la plupart des animes
-      url: `https://www.crunchyroll.com/search?q=${encodeURIComponent(title)}`
-    },
-    netflix: {
-      available: Math.random() > 0.6, // Simulation aléatoire
-      url: `https://www.netflix.com/search?q=${encodeURIComponent(title)}`
-    },
-    'prime video': {
-      available: Math.random() > 0.7,
-      url: `https://www.primevideo.com/search/ref=atv_nb_sr?query=${encodeURIComponent(title)}`
-    },
-    'disney+': {
-      available: Math.random() > 0.8,
-      url: `https://www.disneyplus.com/search?q=${encodeURIComponent(title)}`
-    },
-    funimation: {
-      available: country === 'US' && Math.random() > 0.7,
-      url: `https://www.funimation.com/search/?q=${encodeURIComponent(title)}`
-    },
-    adn: {
-      available: country === 'FR' && Math.random() > 0.5,
-      url: `https://animationdigitalnetwork.fr/recherche?q=${encodeURIComponent(title)}`
-    },
-    wakanim: {
-      available: country === 'FR' && Math.random() > 0.8,
-      url: `https://www.wakanim.tv/fr/v2/search?q=${encodeURIComponent(title)}`
-    },
-    hulu: {
-      available: country === 'US' && Math.random() > 0.6,
-      url: `https://www.hulu.com/search?q=${encodeURIComponent(title)}`
-    },
-    'hbo max': {
-      available: country === 'US' && Math.random() > 0.8,
-      url: `https://www.hbomax.com/search?q=${encodeURIComponent(title)}`
-    },
-    'paramount+': {
-      available: Math.random() > 0.9,
-      url: `https://www.paramountplus.com/search?query=${encodeURIComponent(title)}`
-    },
-    'apple tv+': {
-      available: Math.random() > 0.9,
-      url: `https://tv.apple.com/search?term=${encodeURIComponent(title)}`
-    },
-    peacock: {
-      available: country === 'US' && Math.random() > 0.85,
-      url: `https://www.peacocktv.com/search?q=${encodeURIComponent(title)}`
-    },
-    hidive: {
-      available: Math.random() > 0.8,
-      url: `https://www.hidive.com/search?q=${encodeURIComponent(title)}`
-    },
-    aniplus: {
-      available: (country === 'KR' || country === 'JP') && Math.random() > 0.7,
-      url: `https://www.aniplus-asia.com/search?q=${encodeURIComponent(title)}`
-    }
-  };
-}
+// Streaming availability is now fetched from backend; local simulator removed.
 
 // Fonction pour organiser les animes par jour de la semaine (Jikan API via backend)
-function organizaByWeekDay(animes, country = 'FR') {
+function organizaByWeekDay(animes) {
   const weekDays = {
     'monday': [],
     'tuesday': [],
@@ -101,11 +49,17 @@ function organizaByWeekDay(animes, country = 'FR') {
         mal_id: anime.mal_id,
         title: anime.title || anime.title_english || 'Titre non disponible',
         synopsis: anime.synopsis || 'Aucune description disponible',
+        // Preserve both webp and jpg variants returned by the backend (Jikan)
         images: {
+          webp: {
+            large_image_url: anime.images?.webp?.large_image_url || null,
+            small_image_url: anime.images?.webp?.small_image_url || null,
+            image_url: anime.images?.webp?.image_url || null
+          },
           jpg: {
-            image_url: anime.images?.jpg?.large_image_url || 
-                      anime.images?.jpg?.image_url || 
-                      'https://via.placeholder.com/500x750?text=No+Image'
+            large_image_url: anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || null,
+            small_image_url: anime.images?.jpg?.small_image_url || null,
+            image_url: anime.images?.jpg?.image_url || null
           }
         },
         score: anime.score || 0,
@@ -115,7 +69,8 @@ function organizaByWeekDay(animes, country = 'FR') {
         popularity: anime.popularity || 0,
         status: anime.status,
         episode_count: anime.episodes,
-        streamingInfo: generateStreamingInfo({ title: anime.title }, country)
+        // streamingInfo now provided by backend per-anime; leave empty here
+        streamingInfo: {}
       };
       
       weekDays[dayName].push(formattedAnime);
@@ -146,38 +101,36 @@ export const useTodayReleases = () => {
           throw new Error(data.error || 'Erreur lors de la récupération des données');
         }
         
-        console.log('📊 Données brutes du backend:', data);
+  if (import.meta.env.DEV) console.log('📊 Données brutes du backend:', data);
         
         // Les données viennent maintenant de Jikan (via le backend) et sont déjà au bon format
         const animesArray = data.data.data || []; // data.data.data car le backend structure ses réponses comme {success, data: jikanResponse}
         
-        console.log('🎌 Animes bruts depuis Jikan:', animesArray);
+  if (import.meta.env.DEV) console.log('🎌 Animes bruts depuis Jikan:', animesArray);
         
         // Adapter le format Jikan API (qui est déjà au bon format) avec streamingInfo
         const formattedData = animesArray.map(anime => {
-          console.log('📝 Anime individuel:', anime);
+          if (import.meta.env.DEV) console.log('📝 Anime individuel:', anime);
           
-          // Générer les infos de streaming
-          const streamingInfo = generateStreamingInfo({ attributes: { titles: { en: anime.title } } }, country);
-          
-          // Convertir streamingInfo en array pour AnimeCard
-          const streamingArray = Object.entries(streamingInfo)
-            .filter(([, info]) => info.available)
-            .map(([platform, info]) => ({
-              name: platform,
-              url: info.url,
-              logo: platform // Le composant PlatformLogo utilisera ce nom
-            }));
+          // Streaming handled by backend; do not simulate here
+          const streamingArray = [];
+          const streamingInfo = {};
           
           const formattedAnime = {
             mal_id: anime.mal_id,
             title: anime.title || anime.title_english || 'Titre non disponible',
             synopsis: anime.synopsis || 'Aucune description disponible',
+            // Preserve webp + jpg variants for the card component to choose from
             images: {
+              webp: {
+                large_image_url: anime.images?.webp?.large_image_url || null,
+                small_image_url: anime.images?.webp?.small_image_url || null,
+                image_url: anime.images?.webp?.image_url || null
+              },
               jpg: {
-                image_url: anime.images?.jpg?.large_image_url || 
-                          anime.images?.jpg?.image_url || 
-                          'https://via.placeholder.com/500x750?text=No+Image'
+                large_image_url: anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || null,
+                small_image_url: anime.images?.jpg?.small_image_url || null,
+                image_url: anime.images?.jpg?.image_url || null
               }
             },
             score: anime.score || 0,
@@ -190,15 +143,15 @@ export const useTodayReleases = () => {
             episodes: anime.episodes,
             genres: anime.genres || [],
             broadcast: anime.broadcast || {},
-            streaming: streamingArray, // Array des plateformes disponibles
+            streaming: streamingArray, // Array des plateformes disponibles (fetched from backend)
             streamingInfo: streamingInfo // Garde aussi l'objet complet pour compatibilité
           };
           
-          console.log('✅ Anime formaté:', formattedAnime);
+            if (import.meta.env.DEV) console.log('✅ Anime formaté:', formattedAnime);
           return formattedAnime;
         });
         
-        console.log('📋 Total des animes formatés:', formattedData.length);
+  if (import.meta.env.DEV) console.log('📋 Total des animes formatés:', formattedData.length);
         return formattedData;
         
       } catch (error) {
@@ -248,15 +201,29 @@ export const useWeeklyReleases = () => {
 };
 
 // Hook pour les informations de streaming (fonction legacy)
-export const useStreamingInfo = (animeId, country = 'FR') => {
+export const useStreamingInfo = (animeId, country = 'FR', options = {}) => {
+  const enabled = options.enabled ?? true;
   return useQuery({
-    queryKey: ['streamingInfo', animeId, country],
-    queryFn: () => {
-      return {
-        availableOn: ['Crunchyroll', 'Netflix'],
-        country: country
-      };
-    }
+    queryKey: ['animePlatforms', animeId, country],
+    queryFn: async () => {
+      try {
+        if (!animeId) return [];
+        const path = `/api/anime/anime/${encodeURIComponent(animeId)}/platforms`;
+        const url = buildBackendUrl(path, { country });
+        const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data || !data.platforms || !data.platforms.data) return [];
+        return data.platforms.data;
+      } catch (e) {
+        console.error('Erreur fetching anime platforms:', e);
+        return [];
+      }
+    },
+    enabled,
+    staleTime: 1000 * 60 * 60, // 1 heure
+    cacheTime: 1000 * 60 * 60 * 6, // 6 heures
+    retry: 1
   });
 };
 

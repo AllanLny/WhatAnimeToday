@@ -193,6 +193,29 @@ public class AnimeController {
     }
     
     /**
+     * Diagnostics: compare Jikan vs Kitsu pour les sorties du jour
+     */
+    @GetMapping("/diagnostics/today-sources")
+    public ResponseEntity<Map<String, Object>> compareTodaySources(
+            @RequestParam(defaultValue = "FR") String country) {
+        try {
+            var report = statisticsService.compareTodaySources(country);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("country", country);
+            response.put("report", report);
+            response.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", "Erreur diagnostics: " + e.getMessage());
+            errorResponse.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    /**
      * 📊 Récupère les statistiques globales pour le dashboard
      */
     @GetMapping("/stats")
@@ -259,14 +282,16 @@ public class AnimeController {
      */
     @GetMapping("/anime/{animeId}/platforms")
     public ResponseEntity<Map<String, Object>> getAnimePlatforms(
-            @PathVariable String animeId) {
+        @PathVariable String animeId,
+        @RequestParam(required = false, defaultValue = "") String country) {
         
         try {
-            var platforms = animeDataService.getStreamingPlatforms(animeId);
+            var platforms = animeDataService.getStreamingPlatforms(animeId, country);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("animeId", animeId);
+            if (country != null && !country.isBlank()) response.put("country", country.toUpperCase());
             response.put("platforms", platforms);
             response.put("timestamp", LocalDateTime.now());
             

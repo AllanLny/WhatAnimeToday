@@ -66,7 +66,6 @@ const Header = () => {
               className="search-input" 
               placeholder={t('search.placeholder', 'Rechercher un anime...')}
             />
-            <span className="search-icon">🔍</span>
           </div>
 
           {/* Language Selector */}
@@ -92,16 +91,16 @@ const Header = () => {
       <nav className={`mobile-nav ${isMobileMenuOpen ? 'open' : ''}`}>
         <ul className="mobile-nav-links">
           <li className="nav-link">
-            <a href="/" className="active">🏠 {t('nav.home')}</a>
+            <a href="/" className="active">{t('nav.home')}</a>
           </li>
           <li className="nav-link">
-            <a href="/calendar">📅 {t('nav.calendar')}</a>
+            <a href="/calendar">{t('nav.calendar')}</a>
           </li>
           <li className="nav-link">
-            <a href="/watchlist">📺 {t('nav.watchlist', 'Ma Liste')}</a>
+            <a href="/watchlist">{t('nav.watchlist', 'Ma Liste')}</a>
           </li>
           <li className="nav-link">
-            <a href="/trending">🔥 {t('nav.trending', 'Tendances')}</a>
+            <a href="/trending">{t('nav.trending', 'Tendances')}</a>
           </li>
         </ul>
         

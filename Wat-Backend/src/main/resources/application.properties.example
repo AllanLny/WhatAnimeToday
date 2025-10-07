@@ -11,6 +11,10 @@ server.port=8080
 kitsu.api.base-url=https://kitsu.io/api/edge
 jikan.api.base-url=https://api.jikan.moe/v4
 
+# TMDB (utilisé pour récupérer les fournisseurs de streaming)
+tmdb.api.base-url=https://api.themoviedb.org/3
+tmdb.api.key=YOUR_TMDB_API_KEY
+
 # Cache
 app.cache.default-ttl-hours=24
 

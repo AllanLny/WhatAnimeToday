@@ -1,23 +1,31 @@
 @use '../../../../variables' as vars;
 
 .country-select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
   background: vars.color('bg-secondary');
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: vars.radius('lg');
   color: vars.color('text-primary');
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 500;
-  padding: vars.spacing('sm') vars.spacing('lg') vars.spacing('sm') vars.spacing('sm');
+  padding: 0 vars.spacing('sm') 0 vars.spacing('sm');
   transition: all 0.2s ease;
   min-width: 140px;
   display: inline-block;
+  box-sizing: border-box;
   outline: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
-  background-position: right 12px center;
+  background-position: right 12px 50%;
   background-size: 16px;
+
+  /* Make sure long country names render nicely */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 
   &:hover {
     border-color: rgba(255, 59, 59, 0.3);
@@ -45,4 +53,30 @@
     background-size: 14px;
     background-position: right 8px center;
   }
+
+  // Match toggle buttons height/shape used in Home.scss
+  height: 32px;
+  border-radius: vars.radius('lg');
+  display: inline-flex;
+  align-items: center;
+  padding-left: vars.spacing('sm');
+  padding-right: calc(var(--spacing-sm) + 28px); /* reserve space for arrow */
+}
+
+/* Ensure this class (used globally in Home.scss) matches toggle button dimensions
+   We make the selector specific so it overrides the global .country-selector rules
+*/
+.country-select.country-selector,
+.country-selector.country-select,
+.country-selector {
+  height: 32px !important;
+  min-height: 32px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: var(--spacing-sm, 8px) !important;
+  padding-right: calc(var(--spacing-sm, 8px) + 28px) !important; /* reserve arrow */
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
 }

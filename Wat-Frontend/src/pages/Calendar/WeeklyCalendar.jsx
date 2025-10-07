@@ -1,8 +1,27 @@
 import { useState } from 'react';
 import { useUserContext } from '../../context/UserContext';
-import { useWeeklyReleases } from '../../services/api';
+import { useWeeklyReleases, useStreamingInfo } from '../../services/api';
 import { PlatformLogo } from '../../components/Common';
 import './WeeklyCalendar.scss';
+// ...existing imports...
+
+// Small helper to render streaming platforms for a given anime using backend data
+const WeeklyStreamingPlatforms = ({ anime }) => {
+  const { country } = useUserContext();
+  const animeId = anime.title || anime.canonicalTitle || anime.mal_id || anime.id || anime.slug;
+  const { data: platforms = [], isLoading } = useStreamingInfo(animeId, country);
+  if (isLoading) return null;
+  if (!platforms || platforms.length === 0) return null;
+
+  return (
+    <>
+      {platforms.slice(0, 4).map((p, i) => (
+        <PlatformLogo key={i} platform={p.normalized_name || p.provider_name} size="small" />
+      ))}
+      {platforms.length > 4 && <span className="more-platforms">+{platforms.length - 4}</span>}
+    </>
+  );
+};
 
 function WeeklyCalendar() {
   const [selectedPlatform, setSelectedPlatform] = useState('all');
@@ -18,7 +37,6 @@ function WeeklyCalendar() {
   
   // Construction du calendrier avec les informations de streaming
   // Avec TanStack Query, les données de streaming sont déjà incluses
-  
   if (isLoading) return <div className="loading-spinner">Chargement du calendrier...</div>;
   if (isError) return <div className="error-message">{error?.message || "Erreur lors de la récupération du calendrier. Veuillez réessayer plus tard."}</div>;
 
@@ -144,21 +162,27 @@ function WeeklyCalendar() {
                     className="calendar-anime-card"
                     onClick={() => handleAnimeClick(anime)}
                   >
-                    <img 
-                      src={anime.images.jpg.image_url} 
-                      alt={anime.title} 
-                      className="calendar-anime-image" 
-                    />
+                      <picture>
+                        {anime.images?.webp?.image_url && (
+                          <source srcSet={anime.images.webp.image_url} type="image/webp" />
+                        )}
+                        {anime.images?.jpg?.image_url && (
+                          <source srcSet={anime.images.jpg.image_url} type="image/jpeg" />
+                        )}
+                        <img
+                          src={anime.images?.webp?.image_url || anime.images?.jpg?.image_url || '/placeholder-anime.jpg'}
+                          alt={anime.title}
+                          className="calendar-anime-image"
+                          loading="lazy"
+                          width="160"
+                          height="240"
+                        />
+                      </picture>
                     <div className="calendar-anime-info">
                       <h3>{anime.title}</h3>
                       <p>Épisode: {anime.broadcast?.string || 'Horaire non précisé'}</p>
                       <div className="available-platforms">
-                        {Object.entries(anime.streamingInfo || {})
-                          .filter(([, info]) => info.available)
-                          .map(([platform]) => (
-                            <PlatformLogo key={platform} platform={platform} size="small" />
-                          ))
-                        }
+                        <WeeklyStreamingPlatforms anime={anime} />
                       </div>
                     </div>
                   </div>
