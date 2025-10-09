@@ -18,8 +18,7 @@ const Header = () => {
       setIsScrolled(scrollTop > 50);
       setScrollProgress(Math.min(scrollPercent, 100));
       
-      // Debug pour voir les valeurs
-      console.log(`Scroll: ${scrollTop}, DocHeight: ${docHeight}, Percent: ${scrollPercent}`);
+  // (no debug logs)
     };
 
     window.addEventListener('scroll', handleScroll);

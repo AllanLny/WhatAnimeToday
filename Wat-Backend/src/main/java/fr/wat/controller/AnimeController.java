@@ -1,7 +1,7 @@
 package fr.wat.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import fr.wat.dto.ApiResponse;
-import fr.wat.dto.GlobalStatsResponse;
 import fr.wat.service.AnimeDataService;
 import fr.wat.service.StatisticsService;
 import fr.wat.util.CountryValidator;
@@ -277,33 +277,133 @@ public class AnimeController {
         }
     }
     
+
     /**
-     * Récupérer les plateformes de streaming pour un anime spécifique
+     * Récupérer les plateformes de streaming directement via un TMDB id (sans besoin d'animeId/MAL)
+     */
+    @GetMapping("/tmdb/{tmdbId}/platforms")
+    public ResponseEntity<Map<String, Object>> getPlatformsByTmdbId(
+            @PathVariable String tmdbId,
+            @RequestParam(required = false, defaultValue = "") String country) {
+
+        try {
+            // Pass an empty animeId and forward the provided TMDB id to the service
+            var platforms = animeDataService.getStreamingPlatforms("", country, tmdbId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("tmdbId", tmdbId);
+            if (country != null && !country.isBlank()) response.put("country", country.toUpperCase());
+            response.put("platforms", platforms);
+            response.put("timestamp", LocalDateTime.now());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", "Erreur lors de la récupération des plateformes par TMDB id: " + e.getMessage());
+            errorResponse.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    /**
+     * Récupérer les plateformes de streaming pour un anime identifié par son animeId (ex: MAL id)
+     * Cette route est ajoutée pour conserver la compatibilité avec le frontend qui appelle
+     * `/api/anime/anime/{animeId}/platforms`.
      */
     @GetMapping("/anime/{animeId}/platforms")
-    public ResponseEntity<Map<String, Object>> getAnimePlatforms(
-        @PathVariable String animeId,
-        @RequestParam(required = false, defaultValue = "") String country) {
-        
+    public ResponseEntity<Map<String, Object>> getPlatformsByAnimeId(
+            @PathVariable String animeId,
+            @RequestParam(required = false, defaultValue = "") String country) {
+
         try {
-            var platforms = animeDataService.getStreamingPlatforms(animeId, country);
-            
+            var platforms = animeDataService.getStreamingPlatforms(animeId, country, null);
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("animeId", animeId);
             if (country != null && !country.isBlank()) response.put("country", country.toUpperCase());
             response.put("platforms", platforms);
             response.put("timestamp", LocalDateTime.now());
-            
+
             return ResponseEntity.ok(response);
-            
+
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("error", "Erreur lors de la récupération des plateformes: " + e.getMessage());
+            errorResponse.put("error", "Erreur lors de la récupération des plateformes par animeId: " + e.getMessage());
             errorResponse.put("timestamp", LocalDateTime.now());
-            
             return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    /**
+     * DEBUG: chercher TMDB pour un titre (q) et renvoyer le résultat brute
+     */
+    @GetMapping("/debug/tmdb/search")
+    public ResponseEntity<Map<String, Object>> debugTmdbSearch(@RequestParam String q) {
+        try {
+            JsonNode resp = animeDataService.debugSearchTmdb(q);
+            Map<String, Object> out = new HashMap<>();
+            out.put("success", true);
+            out.put("query", q);
+            out.put("result", resp);
+            out.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.ok(out);
+        } catch (Exception e) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("error", e.getMessage());
+            err.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.status(500).body(err);
+        }
+    }
+
+    /**
+     * DEBUG: rechercher TMDB et récupérer les providers pour inspection
+     */
+    @GetMapping("/debug/tmdb/providers")
+    public ResponseEntity<Map<String, Object>> debugTmdbProviders(@RequestParam String q, @RequestParam(required = false, defaultValue = "") String country) {
+        try {
+            JsonNode resp = animeDataService.debugTmdbProviders(q, country);
+            Map<String, Object> out = new HashMap<>();
+            out.put("success", true);
+            out.put("query", q);
+            out.put("country", country);
+            out.put("data", resp);
+            out.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.ok(out);
+        } catch (Exception e) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("error", e.getMessage());
+            err.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.status(500).body(err);
+        }
+    }
+
+    /**
+     * Resolve TMDB candidates with scoring and provider checks
+     */
+    @GetMapping("/tmdb/resolve")
+    public ResponseEntity<Map<String, Object>> resolveTmdb(@RequestParam String q, @RequestParam(required = false) Integer year, @RequestParam(required = false, defaultValue = "FR") String country) {
+        try {
+            JsonNode resp = animeDataService.resolveTmdbCandidates(q, year, country);
+            Map<String, Object> out = new HashMap<>();
+            out.put("success", true);
+            out.put("query", q);
+            out.put("country", country);
+            out.put("data", resp);
+            out.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.ok(out);
+        } catch (Exception e) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("error", e.getMessage());
+            err.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.status(500).body(err);
         }
     }
 }

@@ -6,10 +6,22 @@ import { useWATTranslation } from '../../../../hooks/useWATTranslation';
 import useInView from '../../../../hooks/useInView';
 import { memo } from 'react';
 
+// Helper: retourne le titre préféré selon la langue (préférer title_english sauf pour japonais)
+const getPreferredTitle = (anime, language) => {
+  const englishFromList = Array.isArray(anime.titles) ? (anime.titles.find(t => t.type === 'English') || {}).title : null;
+  const preferredEnglish = anime.title_english || englishFromList || null;
+  if (language && language.toString().startsWith('ja')) {
+    return anime.title || anime.canonicalTitle || preferredEnglish || anime.mal_id || anime.id || anime.slug || '';
+  }
+  return preferredEnglish || anime.title || anime.canonicalTitle || anime.mal_id || anime.id || anime.slug || '';
+};
+
 // Small local component to render streaming platforms fetched from backend
-const StreamingPlatforms = ({ anime, country }) => {
+const StreamingPlatforms = ({ anime, country, language }) => {
   const { ref, inView } = useInView({ triggerOnce: true, rootMargin: '200px' });
-  const animeId = anime.title || anime.canonicalTitle || anime.mal_id || anime.id || anime.slug;
+  const animeId = anime.mal_id || anime.id || anime.slug || anime.title || anime.canonicalTitle;
+
+  // Always fetch platforms from backend by anime id (no TMDB resolver logic here)
   const { data: platforms = [], isLoading } = useStreamingInfo(animeId, country, { enabled: inView });
 
   // Don't render until in view or loaded
@@ -19,11 +31,87 @@ const StreamingPlatforms = ({ anime, country }) => {
 
   const visible = platforms.slice(0, 4);
 
+  // Centralisé: construit un lien utilisateur-friendly pour une plateforme
+  const buildProviderLink = (plat) => {
+    const rawName = (plat.normalized_name || plat.provider_name || '').toString().toLowerCase();
+    const titleForQuery = getPreferredTitle(anime, language) || anime.title || anime.canonicalTitle || '';
+    const q = encodeURIComponent(titleForQuery);
+
+    // Si backend a fourni un lien direct, on le priorise
+    if (plat.link) {
+      return plat.link;
+    }
+
+    const mapping = {
+      'crunchyroll': `https://www.crunchyroll.com/fr/search?query=${q}`,
+      'netflix': `https://www.netflix.com/search?q=${q}`,
+      'prime video': `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`,
+      'primevideo': `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`,
+      'hulu': `https://www.hulu.com/search?q=${q}`,
+      'funimation': `https://www.funimation.com/search/?q=${q}`,
+      'disney+': `https://www.disneyplus.com/search/${q}`,
+      'disney plus': `https://www.disneyplus.com/search/${q}`,
+      'adn': `https://www.adnanime.com/recherche/?q=${q}`,
+      'hidive': `https://www.hidive.com/search?q=${q}`,
+      'hbo max': `https://www.hbomax.com/search?q=${q}`,
+      'paramount+': `https://www.paramountplus.com/search/?q=${q}`,
+      'apple tv+': `https://tv.apple.com/search?term=${q}`,
+      'appletv': `https://tv.apple.com/search?term=${q}`
+    };
+
+    if (mapping[rawName]) return mapping[rawName];
+
+    // Fallback: recherche Google ciblée sur le nom du provider si on a un domaine connu
+    const domainMap = {
+      'crunchyroll': 'crunchyroll.com',
+      'netflix': 'netflix.com',
+      'prime video': 'primevideo.com',
+      'primevideo': 'primevideo.com',
+      'hulu': 'hulu.com',
+      'funimation': 'funimation.com',
+      'disney+': 'disneyplus.com',
+      'disney plus': 'disneyplus.com',
+      'adn': 'adnanime.com',
+      'hidive': 'hidive.com',
+      'hbo max': 'hbomax.com',
+      'paramount+': 'paramountplus.com',
+      'apple tv+': 'tv.apple.com',
+      'appletv': 'tv.apple.com'
+    };
+
+    if (domainMap[rawName]) {
+      return `https://www.google.com/search?q=site:${domainMap[rawName]}+${q}`;
+    }
+
+    // Dernier fallback: recherche Google générique
+    return plat.link || `https://www.google.com/search?q=${q}+${encodeURIComponent(plat.provider_name || '')}`;
+  };
+
   return (
     <div ref={ref} className="streaming-platforms">
-      {visible.map((p, idx) => (
-        <PlatformLogo key={idx} platform={p.normalized_name || p.provider_name} size="small" />
-      ))}
+      {visible.map((p, idx) => {
+        const providerName = p.normalized_name || p.provider_name || '';
+        const providerLink = buildProviderLink(p);
+        return (
+          <span key={idx} className="platform-item">
+            {providerLink ? (
+              <a
+                href={providerLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(ev) => ev.stopPropagation()}
+                title={providerName}
+              >
+                <PlatformLogo platform={providerName} size="small" />
+              </a>
+            ) : (
+              <div onClick={(ev) => ev.stopPropagation()} title={providerName}>
+                <PlatformLogo platform={providerName} size="small" />
+              </div>
+            )}
+          </span>
+        );
+      })}
       {platforms.length > 4 && (
         <div className="more-platforms">+{platforms.length - 4}</div>
       )}
@@ -37,7 +125,16 @@ const AnimeCard = ({
   isLoading = false,
   country = 'FR'
 }) => {
-  const { t } = useWATTranslation();
+  const { t, language } = useWATTranslation();
+
+  // Requirement: only display card if we have an English title AND a TMDB id (present or resolvable)
+  const englishFromList = Array.isArray(anime.titles) ? (anime.titles.find(t => t.type === 'English') || {}).title : null;
+  const hasEnglish = !!(anime.title_english || englishFromList);
+  // Require English title and an anime id (we fetch platforms server-side by mal_id)
+  if (!hasEnglish || !(anime.mal_id || anime.id || anime.slug)) {
+    // hide card (no english title or no TMDB match)
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -54,7 +151,6 @@ const AnimeCard = ({
 
   const {
     title,
-    title_english,
     images,
     synopsis,
     score,
@@ -68,7 +164,19 @@ const AnimeCard = ({
   const webpLarge = images?.webp?.large_image_url;
   const jpgLarge = images?.jpg?.large_image_url || images?.jpg?.image_url;
   const imageUrl = webpLarge || jpgLarge || '/placeholder-anime.jpg';
-  const displayTitle = title || title_english || t('anime.noTitle', 'Titre non disponible');
+  // Preferred title centralisé
+  const displayTitle = getPreferredTitle(anime, language) || t('anime.noTitle', 'Titre non disponible');
+
+  // Default/original title (used as subtitle when different from the preferred/display title)
+  const defaultTitle = title || anime.canonicalTitle || (anime.attributes && anime.attributes.canonicalTitle) || null;
+
+  // Description localisée : prefer description_fr/description_en envoyées par le backend
+  let localizedDescription = null;
+  if (language && language.toString().startsWith('fr')) {
+    localizedDescription = anime.description_fr || anime.description || anime.description_en || synopsis || anime.background || null;
+  } else {
+    localizedDescription = anime.description_en || anime.description || anime.description_fr || synopsis || anime.background || null;
+  }
   const episodeText = episodes ? t('anime.episodes', { count: episodes }) : t('anime.episodesTBA', 'Episodes TBA');
   
   // Status mapping
@@ -117,7 +225,81 @@ const AnimeCard = ({
         
         {/* Hover Overlay */}
         <div className="anime-overlay">
-          <button className="watch-button">
+          <button
+            className="watch-button"
+            onClick={async (e) => {
+              e.preventDefault();
+              // Fetch platforms for this anime and open the preferred provider link
+              try {
+                // Fast path: if legacy streaming array exists on the anime object, use it
+                let platforms = anime.streaming || anime.platforms || null;
+                if (!platforms) {
+                  // Prefer TMDB flow: use anime.tmdb_id if present, otherwise try to resolve TMDB id via backend
+                  const tmdbIdLocal = anime.tmdb_id || anime.tmdbId || null;
+                  let resp, data;
+                  if (tmdbIdLocal) {
+                    resp = await fetch(`/api/anime/tmdb/${encodeURIComponent(tmdbIdLocal)}/platforms?country=${country}`);
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    data = await resp.json();
+                    platforms = (data && data.platforms && data.platforms.data) ? data.platforms.data : (data && data.data) ? data.data : [];
+                  } else {
+                    // Try resolving TMDB id via resolver endpoint
+                    const titleForResolve = getPreferredTitle(anime, language) || anime.title || anime.canonicalTitle || '';
+                    if (titleForResolve) {
+                      const yearParam = anime.year || (anime.first_air_date || '').slice(0,4) || '';
+                      const resolveUrl = `/api/anime/tmdb/resolve?q=${encodeURIComponent(titleForResolve)}${yearParam?`&year=${encodeURIComponent(yearParam)}`:''}&country=${encodeURIComponent(country)}`;
+                      const r = await fetch(resolveUrl);
+                      if (r.ok) {
+                        const j = await r.json();
+                        const best = j.data?.best || j.best || null;
+                        const foundTmdb = best && best.id ? String(best.id) : null;
+                        if (foundTmdb) {
+                          const resp2 = await fetch(`/api/anime/tmdb/${encodeURIComponent(foundTmdb)}/platforms?country=${country}`);
+                          if (resp2.ok) {
+                            const d2 = await resp2.json();
+                            platforms = (d2 && d2.platforms && d2.platforms.data) ? d2.platforms.data : (d2 && d2.data) ? d2.data : [];
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+
+                if (!platforms || platforms.length === 0) {
+                  // No provider found: open search on MyAnimeList as fallback
+                  const fallback = `https://myanimelist.net/search/all?q=${encodeURIComponent(displayTitle)}`;
+                  window.open(fallback, '_blank', 'noopener');
+                  return;
+                }
+
+                // Prefer platforms by type and display_priority
+                const priorityOrder = { 'flatrate': 0, 'free': 1, 'buy': 2, 'rent': 3 };
+                platforms.sort((a, b) => {
+                  const pa = priorityOrder[a.type] ?? 10;
+                  const pb = priorityOrder[b.type] ?? 10;
+                  if (pa !== pb) return pa - pb;
+                  const da = a.display_priority ?? 0;
+                  const db = b.display_priority ?? 0;
+                  return db - da; // higher display_priority first
+                });
+
+                const top = platforms[0];
+                // Some providers include a 'link' field (TMDB link); otherwise build a generic provider page
+                const preferredTitleForQuery = getPreferredTitle(anime, language) || displayTitle;
+                const providerLink = top.link || (`https://www.themoviedb.org/provider/${top.provider_id}`) || null || (`https://www.google.com/search?q=${encodeURIComponent(preferredTitleForQuery)}`);
+                if (providerLink) {
+                  window.open(providerLink, '_blank', 'noopener');
+                } else {
+                  const fallback2 = `https://myanimelist.net/search/all?q=${encodeURIComponent(displayTitle)}`;
+                  window.open(fallback2, '_blank', 'noopener');
+                }
+              } catch (err) {
+                console.error('Erreur lors de la récupération des plateformes:', err);
+                const fallback = `https://myanimelist.net/search/all?q=${encodeURIComponent(displayTitle)}`;
+                window.open(fallback, '_blank', 'noopener');
+              }
+            }}
+          >
             <span className="play-icon">▶</span>
             {t('anime.watch', 'Regarder')}
           </button>
@@ -127,8 +309,8 @@ const AnimeCard = ({
       <div className="anime-content">
         <div className="anime-header">
           <h3 className="anime-title">{displayTitle}</h3>
-          {title_english && title !== title_english && (
-            <p className="anime-subtitle">{title_english}</p>
+          {defaultTitle && defaultTitle !== displayTitle && (
+            <p className="anime-subtitle">{defaultTitle}</p>
           )}
         </div>
 
@@ -175,12 +357,12 @@ const AnimeCard = ({
         )}
 
   {/* Streaming Info - fetch only when visible */}
-  <StreamingPlatforms anime={anime} country={country} />
+  <StreamingPlatforms anime={anime} country={country} language={language} />
 
-        {/* Synopsis */}
-        {synopsis && (
+        {/* Synopsis / Description localisée */}
+        {localizedDescription && (
           <p className="anime-synopsis">
-            {synopsis}
+            {localizedDescription}
           </p>
         )}
 

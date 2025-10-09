@@ -81,11 +81,13 @@ function organizaByWeekDay(animes) {
 }
 
 // Hook pour les sorties du jour (utilise le backend avec Kitsu API)
-export const useTodayReleases = () => {
+export const useTodayReleases = (options = {}) => {
   const { country } = useUserContext?.() || { country: 'FR' };
+  const enabled = options.enabled ?? true;
   
   return useQuery({
     queryKey: ['todayReleases', country],
+    enabled,
     queryFn: async () => {
       try {
         const url = buildBackendUrl('/api/anime/today', { country });
@@ -109,7 +111,7 @@ export const useTodayReleases = () => {
   if (import.meta.env.DEV) console.log('🎌 Animes bruts depuis Jikan:', animesArray);
         
         // Adapter le format Jikan API (qui est déjà au bon format) avec streamingInfo
-        const formattedData = animesArray.map(anime => {
+  const formattedData = animesArray.map(anime => {
           if (import.meta.env.DEV) console.log('📝 Anime individuel:', anime);
           
           // Streaming handled by backend; do not simulate here
@@ -118,8 +120,14 @@ export const useTodayReleases = () => {
           
           const formattedAnime = {
             mal_id: anime.mal_id,
+            // Keep both title and title_english if provided by backend
             title: anime.title || anime.title_english || 'Titre non disponible',
-            synopsis: anime.synopsis || 'Aucune description disponible',
+            title_english: anime.title_english || null,
+            titles: anime.titles || [],
+            // Provide localized descriptions if backend enriched them
+            description_en: anime.description_en || null,
+            description_fr: anime.description_fr || null,
+            synopsis: anime.synopsis || anime.description_en || anime.description_fr || 'Aucune description disponible',
             // Preserve webp + jpg variants for the card component to choose from
             images: {
               webp: {
@@ -165,11 +173,13 @@ export const useTodayReleases = () => {
 };
 
 // Hook pour le calendrier hebdomadaire (utilise le backend avec Kitsu API)
-export const useWeeklyReleases = () => {
+export const useWeeklyReleases = (options = {}) => {
   const { country } = useUserContext?.() || { country: 'FR' };
+  const enabled = options.enabled ?? true;
   
   return useQuery({
     queryKey: ['weeklyReleases', country],
+    enabled,
     queryFn: async () => {
       try {
         const url = buildBackendUrl('/api/anime/weekly', { country });
@@ -227,10 +237,69 @@ export const useStreamingInfo = (animeId, country = 'FR', options = {}) => {
   });
 };
 
+// New hook: fetch streaming platforms by TMDB id (preferred flow)
+export const useStreamingByTmdb = (tmdbId, country = 'FR', options = {}) => {
+  const enabled = options.enabled ?? true;
+  return useQuery({
+    queryKey: ['animePlatformsByTmdb', tmdbId, country],
+    enabled: enabled && !!tmdbId,
+    queryFn: async () => {
+      try {
+        if (!tmdbId) return [];
+        const path = `/api/anime/tmdb/${encodeURIComponent(tmdbId)}/platforms`;
+        const url = buildBackendUrl(path, { country });
+        const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data || !data.platforms || !data.platforms.data) return [];
+        return data.platforms.data;
+      } catch (e) {
+        console.error('Erreur fetching anime platforms by TMDB id:', e);
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 60, // 1 heure
+    cacheTime: 1000 * 60 * 60 * 6, // 6 heures
+    retry: 1
+  });
+};
+
+// Hook: resolve a title -> TMDB id using backend resolver
+export const useResolveTmdb = (title, year = null, country = 'FR', options = {}) => {
+  const enabled = options.enabled ?? true;
+  return useQuery({
+    queryKey: ['resolveTmdb', title, year, country],
+    enabled: enabled && !!title,
+    queryFn: async () => {
+      try {
+        const params = {};
+        params.q = title;
+        if (year) params.year = year;
+        params.country = country;
+        const url = buildBackendUrl('/api/anime/tmdb/resolve', params);
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json = await resp.json();
+        // backend: returns out.data.best
+        const best = json.data?.best || json.best || null;
+        return best && best.id ? String(best.id) : null;
+      } catch (e) {
+        console.error('Erreur resolving tmdb id:', e);
+        return null;
+      }
+    },
+    staleTime: 1000 * 60 * 60, // 1h
+    cacheTime: 1000 * 60 * 60 * 6,
+    retry: 1
+  });
+};
+
 // 📊 Hook pour récupérer les statistiques globales
-export const useGlobalStats = (country = 'FR') => {
+export const useGlobalStats = (country = 'FR', options = {}) => {
+  const enabled = options.enabled ?? true;
   return useQuery({
     queryKey: ['globalStats', country],
+    enabled,
     queryFn: async () => {
       try {
         // Appel vers notre backend pour récupérer les statistiques

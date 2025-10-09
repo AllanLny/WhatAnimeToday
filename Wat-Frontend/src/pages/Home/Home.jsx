@@ -1,4 +1,5 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
+import { FixedSizeGrid, FixedSizeList } from 'react-window';
 import './Home.scss';
 const Header = React.lazy(() => import('../../components/Layout/Header'));
 import { Loading, ErrorMessage, CountrySelector } from '../../components/Common';
@@ -12,11 +13,11 @@ const Home = () => {
   const { t, formatNumber } = useWATTranslation();
   const { country, setCountry } = useUserContext() || { country: 'FR', setCountry: () => {} };
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
-  // Fetch today's releases using the custom hook
-  const { data: animesAujourdhui, isLoading, error, refetch } = useTodayReleases();
+  // Fetch today's releases using the custom hook (deferred to avoid blocking LCP)
+  const { data: animesAujourdhui, isLoading, error, refetch } = useTodayReleases({ enabled: false });
   
-  // Fetch global statistics from backend
-  const { data: stats, isLoading: statsLoading, error: statsError } = useGlobalStats(country);
+  // Fetch global statistics from backend (deferred)
+  const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useGlobalStats(country, { enabled: false });
 
   // Default stats si les données ne sont pas encore chargées ou si erreur
   const displayStats = stats || {
@@ -94,35 +95,153 @@ const Home = () => {
       );
     }
 
+    // If small list, keep simple rendering to avoid virtualization overhead
+    if (animesAujourdhui.length < 12) {
+      return (
+        <div className={`anime-grid ${viewMode}-view`} ref={containerRef}>
+          {animesAujourdhui.map((anime) => (
+            <Suspense key={anime.mal_id} fallback={<div style={{width: 220, height: 320}} />}>
+              <AnimeCard 
+                anime={anime} 
+                variant={viewMode === 'list' ? 'list' : 'default'}
+                country={country}
+              />
+            </Suspense>
+          ))}
+        </div>
+      );
+    }
+
+    if (viewMode === 'list') {
+      const height = Math.min(800, window.innerHeight - 200);
+      return (
+        <div ref={containerRef} style={{ width: '100%', height }}>
+          <FixedSizeList
+            height={height}
+            itemCount={animesAujourdhui.length}
+            itemSize={140}
+            width={'100%'}
+            itemData={animesAujourdhui}
+          >
+            {ListRow}
+          </FixedSizeList>
+        </div>
+      );
+    }
+
+    // Grid virtualization
+    const rowCount = Math.ceil(animesAujourdhui.length / columns);
+    const gridHeight = Math.min(900, window.innerHeight - 200);
     return (
-      <div className={`anime-grid ${viewMode}-view`}>
-        {animesAujourdhui.map((anime) => (
-          <Suspense key={anime.mal_id} fallback={<div style={{width: 220, height: 320}} />}>
-            <AnimeCard 
-              anime={anime} 
-              variant={viewMode === 'list' ? 'list' : 'default'}
-              country={country}
-            />
-          </Suspense>
-        ))}
+      <div ref={containerRef} style={{ width: '100%', height: gridHeight }}>
+        <FixedSizeGrid
+          columnCount={columns}
+          columnWidth={CARD_WIDTH + gutter}
+          height={gridHeight}
+          rowCount={rowCount}
+          rowHeight={CARD_HEIGHT + gutter}
+          width={containerWidth || 800}
+          itemData={animesAujourdhui}
+        >
+          {GridCell}
+        </FixedSizeGrid>
       </div>
     );
   };
 
   // Prefetch streaming info for the first few items to improve perceived performance
   useEffect(() => {
+    // Trigger data fetch after first paint / when browser is idle to reduce LCP impact
+    const startFetch = () => {
+      try {
+        refetch();
+        refetchStats();
+      } catch (err) {
+        // Debug only: ne pas casser l'expérience utilisateur
+        console.debug('Deferred fetch failed', err);
+      }
+    };
+
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(startFetch, { timeout: 1000 });
+      return () => window.cancelIdleCallback && window.cancelIdleCallback(id);
+    }
+
+    // Fallback: schedule after paint
+    const t = setTimeout(startFetch, 500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [country]);
+
+  // Prefetch streaming info for the first few items when the browser is idle
+  useEffect(() => {
     if (!animesAujourdhui || animesAujourdhui.length === 0) return;
-    import('../../lib/queryClient').then(({ queryClient }) => {
-      const prefetchCount = 3; // reduce initial network work
-      animesAujourdhui.slice(0, prefetchCount).forEach(anime => {
-        const animeId = anime.title || anime.canonicalTitle || anime.mal_id || anime.id || anime.slug;
-        queryClient.prefetchQuery(['animePlatforms', animeId, country], () => fetch(`/api/anime/anime/${encodeURIComponent(animeId)}/platforms?country=${country}`).then(r => r.json()), {
-          staleTime: 1000 * 60 * 60,
-          cacheTime: 1000 * 60 * 60
+    const doPrefetch = () => {
+      import('../../lib/queryClient').then(({ queryClient }) => {
+        const prefetchCount = 3; // keep small
+        animesAujourdhui.slice(0, prefetchCount).forEach(anime => {
+          const animeId = anime.title || anime.canonicalTitle || anime.mal_id || anime.id || anime.slug;
+          queryClient.prefetchQuery(['animePlatforms', animeId, country], () => fetch(`/api/anime/anime/${encodeURIComponent(animeId)}/platforms?country=${country}`).then(r => r.json()), {
+            staleTime: 1000 * 60 * 60,
+            cacheTime: 1000 * 60 * 60
+          });
         });
-      });
-    }).catch(()=>{});
+      }).catch(()=>{});
+    };
+
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(doPrefetch, { timeout: 2000 });
+      return () => window.cancelIdleCallback && window.cancelIdleCallback(id);
+    }
+
+    const t = setTimeout(doPrefetch, 1500);
+    return () => clearTimeout(t);
   }, [animesAujourdhui, country]);
+
+  // --- Virtualization helpers ---
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(800);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(Math.floor(entry.contentRect.width));
+      }
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [containerRef]);
+
+  const CARD_WIDTH = 240;
+  const CARD_HEIGHT = 360;
+  const gutter = 12;
+  const columns = Math.max(1, Math.floor(containerWidth / (CARD_WIDTH + gutter)));
+
+  const GridCell = ({ columnIndex, rowIndex, style, data }) => {
+    const index = rowIndex * columns + columnIndex;
+    const anime = data[index];
+    if (!anime) return null;
+    const cellStyle = { ...style, left: style.left + gutter, top: style.top + gutter };
+    return (
+      <div style={cellStyle}>
+        <Suspense fallback={<div style={{width: CARD_WIDTH, height: CARD_HEIGHT}} />}>
+          <AnimeCard anime={anime} variant={viewMode === 'list' ? 'list' : 'default'} country={country} />
+        </Suspense>
+      </div>
+    );
+  };
+
+  const ListRow = ({ index, style, data }) => {
+    const anime = data[index];
+    if (!anime) return null;
+    return (
+      <div style={style}>
+        <Suspense fallback={<div style={{width: '100%', height: 120}} />}>
+          <AnimeCard anime={anime} variant={'list'} country={country} />
+        </Suspense>
+      </div>
+    );
+  };
 
   return (
     <>

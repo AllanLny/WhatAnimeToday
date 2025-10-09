@@ -12,11 +12,12 @@ const WeeklyStreamingPlatforms = ({ anime }) => {
   const { data: platforms = [], isLoading } = useStreamingInfo(animeId, country);
   if (isLoading) return null;
   if (!platforms || platforms.length === 0) return null;
-
   return (
     <>
       {platforms.slice(0, 4).map((p, i) => (
-        <PlatformLogo key={i} platform={p.normalized_name || p.provider_name} size="small" />
+        <a key={i} href={p.link || (`https://www.themoviedb.org/provider/${p.provider_id}`)} target="_blank" rel="noopener noreferrer" onClick={(e)=>e.stopPropagation()}>
+          <PlatformLogo platform={p.normalized_name || p.provider_name} size="small" />
+        </a>
       ))}
       {platforms.length > 4 && <span className="more-platforms">+{platforms.length - 4}</span>}
     </>
@@ -61,16 +62,34 @@ function WeeklyCalendar() {
   // Fonction pour gérer le clic sur un anime
   const handleAnimeClick = (anime) => {
     // Déterminer la plateforme préférée parmi celles disponibles
-    const availablePlatforms = Object.entries(anime.streamingInfo || {})
-      .filter(([, info]) => info.available)
-      .map(([platform]) => platform);
+    // If backend provided an explicit streamingInfo object, prefer it; otherwise, try to fetch platforms array
+    let availablePlatforms = [];
+    if (anime.streamingInfo && typeof anime.streamingInfo === 'object' && !Array.isArray(anime.streamingInfo)) {
+      availablePlatforms = Object.entries(anime.streamingInfo || {})
+        .filter(([, info]) => info.available)
+        .map(([platform]) => platform);
+    } else if (anime.streaming && Array.isArray(anime.streaming) && anime.streaming.length) {
+      availablePlatforms = anime.streaming.map(p => (p.normalized_name || p.provider_name).toString().toLowerCase());
+    } else if (anime.platforms && Array.isArray(anime.platforms) && anime.platforms.length) {
+      availablePlatforms = anime.platforms.map(p => (p.normalized_name || p.provider_name).toString().toLowerCase());
+    }
     
     if (availablePlatforms.length === 0) return;
     
     // Si un filtre de plateforme est actif et que l'anime est disponible sur cette plateforme
-    if (selectedPlatform !== 'all' && anime.streamingInfo?.[selectedPlatform]?.available) {
-      window.open(anime.streamingInfo[selectedPlatform].url, '_blank', 'noopener,noreferrer');
-      return;
+    if (selectedPlatform !== 'all') {
+      // try to use streamingInfo object first
+      if (anime.streamingInfo && anime.streamingInfo[selectedPlatform] && anime.streamingInfo[selectedPlatform].available) {
+        window.open(anime.streamingInfo[selectedPlatform].url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      // otherwise, try to find platform in arrays and open its link
+      const platformObj = (anime.platforms || anime.streaming || []).find(p => ((p.normalized_name || p.provider_name)||'').toString().toLowerCase() === selectedPlatform);
+      if (platformObj && (platformObj.link || platformObj.provider_id)) {
+        const url = platformObj.link && !platformObj.link.includes('themoviedb.org/provider') ? platformObj.link : (`https://www.themoviedb.org/provider/${platformObj.provider_id}`);
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
     }
     
     // Ordre de préférence: la plateforme sélectionnée, puis Crunchyroll, Netflix, ADN, Prime Video, Disney+
@@ -80,7 +99,16 @@ function WeeklyCalendar() {
     const platformToUse = priorityOrder.find(p => availablePlatforms.includes(p)) || availablePlatforms[0];
     
     if (platformToUse) {
-      window.open(anime.streamingInfo[platformToUse].url, '_blank', 'noopener,noreferrer');
+      // prefer explicit streamingInfo url
+      if (anime.streamingInfo && anime.streamingInfo[platformToUse] && anime.streamingInfo[platformToUse].url) {
+        window.open(anime.streamingInfo[platformToUse].url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const platformObj = (anime.platforms || anime.streaming || []).find(p => ((p.normalized_name || p.provider_name)||'').toString().toLowerCase() === platformToUse);
+      if (platformObj) {
+        const url = platformObj.link && !platformObj.link.includes('themoviedb.org/provider') ? platformObj.link : (`https://www.themoviedb.org/provider/${platformObj.provider_id}`);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
     }
   };
 

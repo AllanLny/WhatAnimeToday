@@ -15,10 +15,15 @@ import org.springframework.core.env.Environment;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.DayOfWeek;
+import java.time.temporal.TemporalAdjusters;
+import java.util.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class AnimeDataService {
@@ -51,6 +56,35 @@ public class AnimeDataService {
     }
 
     /**
+     * Mappe un code pays simple vers un ZoneId raisonnable pour affichage local des heures
+     */
+    private ZoneId mapCountryToZone(String country) {
+        if (country == null) return ZoneId.of("UTC");
+        switch (country.toUpperCase()) {
+            case "FR":
+            case "FRANCE":
+                return ZoneId.of("Europe/Paris");
+            case "US":
+            case "USA":
+                return ZoneId.of("America/New_York");
+            case "JP":
+            case "JAPAN":
+                return ZoneId.of("Asia/Tokyo");
+            case "UK":
+            case "GB":
+                return ZoneId.of("Europe/London");
+            case "DE":
+                return ZoneId.of("Europe/Berlin");
+            case "ES":
+                return ZoneId.of("Europe/Madrid");
+            case "IT":
+                return ZoneId.of("Europe/Rome");
+            default:
+                return ZoneId.of("UTC");
+        }
+    }
+
+    /**
      * Recherche Kitsu par titre et retourne le JsonNode brut (ou null)
      */
     public com.fasterxml.jackson.databind.JsonNode searchKitsuByTitle(String title) {
@@ -74,7 +108,7 @@ public class AnimeDataService {
     /**
      * Récupère les données du jour avec filtrage par pays (cache par pays)
      */
-    @Cacheable(value = "todayReleases", key = "#country")
+    @Cacheable(value = "todayReleases", key = "#country + '_' + T(java.time.LocalDate).now(T(java.time.ZoneId).of('Asia/Tokyo')).getDayOfWeek().name()")
     public JsonNode getTodayReleases(String country) {
         System.out.println("🔄 Cache MISS pour today_releases_" + country + " - Appel API");
         
@@ -185,8 +219,8 @@ public class AnimeDataService {
      */
     private JsonNode fetchTodayReleasesForCountry(String country) {
         try {
-            // Obtenir le jour actuel et utiliser l'endpoint spécialisé
-            String todayDay = LocalDate.now().getDayOfWeek().name().toLowerCase();
+            // Obtenir le jour actuel selon le fuseau horaire Tokyo (Jikan liste les programmes selon JST)
+            String todayDay = LocalDate.now(ZoneId.of("Asia/Tokyo")).getDayOfWeek().name().toLowerCase();
             // Jikan peut paginer les résultats. Itérer toutes les pages pour récupérer la totalité des animes du jour.
             ArrayNode filteredData = objectMapper.createArrayNode();
             int page = 1;
@@ -215,6 +249,138 @@ public class AnimeDataService {
                         try {
                             // Conserver les images (webp/jpg) fournis par Jikan et ajouter le pays
                             ((ObjectNode) anime).put("country", country);
+                            // Enrichir les descriptions localisées (fr/en) si possible
+                            try {
+                                enrichLocalizedDescriptions((ObjectNode) anime);
+                            } catch (Exception e) {
+                                System.err.println("⚠️ Enrichissement localisation failed: " + e.getMessage());
+                            }
+
+                            // Si Jikan fournit un objet 'broadcast' avec day/time, convertir
+                            // l'heure (qui est généralement donnée selon la diffusion JST)
+                            // vers le fuseau local du pays demandé pour affichage côté client.
+                            try {
+                                if (anime.has("broadcast") && anime.get("broadcast").isObject()) {
+                                    JsonNode bc = anime.get("broadcast");
+                                    if (bc.has("day") && bc.has("time") && !bc.get("time").isNull() && !bc.get("time").asText().isBlank()) {
+                                        String bcDay = bc.get("day").asText().toLowerCase();
+                                        String bcTime = bc.get("time").asText();
+                                        // Parse time (format expected HH:mm or H:mm)
+                                        try {
+                                            DateTimeFormatter tf = DateTimeFormatter.ofPattern("H:mm");
+                                            LocalTime localTime = LocalTime.parse(bcTime, tf);
+
+                                            // Map country to a timezone (fallback to UTC)
+                                            ZoneId targetZone = mapCountryToZone(country);
+                                            ZoneId jst = ZoneId.of("Asia/Tokyo");
+
+                                            // Map bcDay string to DayOfWeek (Jikan uses english day names)
+                                            DayOfWeek dow;
+                                            try {
+                                                dow = DayOfWeek.valueOf(bcDay.toUpperCase());
+                                            } catch (Exception e) {
+                                                // If parsing fails, use today's day in JST
+                                                dow = ZonedDateTime.now(jst).getDayOfWeek();
+                                            }
+
+                                            ZonedDateTime nowJst = ZonedDateTime.now(jst);
+                                            ZonedDateTime broadcastJst = nowJst.with(TemporalAdjusters.nextOrSame(dow)).with(localTime);
+
+                                            // Convert instant to target zone
+                                            ZonedDateTime broadcastLocal = broadcastJst.withZoneSameInstant(targetZone);
+
+                                            // Store converted values for frontend convenience
+                                            ((ObjectNode) bc).put("broadcast_local_time", broadcastLocal.toLocalTime().toString());
+                                            ((ObjectNode) bc).put("broadcast_local_day", broadcastLocal.getDayOfWeek().name().toLowerCase());
+                                            ((ObjectNode) bc).put("broadcast_local_zone", targetZone.getId());
+                                        } catch (Exception timeEx) {
+                                            // ignore parse errors
+                                        }
+                                    }
+                                }
+                            } catch (Exception ex) {
+                                // non-blocking
+                            }
+
+                            // Règle côté serveur demandée par l'utilisateur :
+                            // Pour tous les pays sauf le Japon, ne renvoyer l'anime
+                            // que s'il possède soit un titre anglais, soit au moins
+                            // un provider disponible dans le pays.
+                            boolean isJapan = "JP".equalsIgnoreCase(country) || "JAPAN".equalsIgnoreCase(country);
+
+                            // Détecter présence d'un titre anglais dans le noeud Jikan/Kitsu enrichi
+                            boolean hasEnglish = false;
+                            try {
+                                if (anime.has("title_english") && !anime.get("title_english").isNull() && !anime.get("title_english").asText().isBlank()) {
+                                    hasEnglish = true;
+                                } else if (anime.has("attributes") && anime.get("attributes").has("titles") && anime.get("attributes").get("titles").has("en")) {
+                                    hasEnglish = true;
+                                } else if (anime.has("titles") && anime.get("titles").isArray()) {
+                                    for (JsonNode t : anime.get("titles")) {
+                                        if (t.has("type") && t.has("title") && t.get("type").asText().toLowerCase().contains("english")) {
+                                            hasEnglish = true; break;
+                                        }
+                                    }
+                                }
+                            } catch (Exception ex) {
+                                // ignore detection errors and assume no english
+                            }
+
+                            if (!isJapan && !hasEnglish) {
+                                // Construire un titre de recherche minimal pour TMDB
+                                String queryTitle = null;
+                                try {
+                                    if (anime.has("title_english") && !anime.get("title_english").isNull()) queryTitle = anime.get("title_english").asText();
+                                    if ((queryTitle == null || queryTitle.isBlank()) && anime.has("title") && !anime.get("title").isNull()) queryTitle = anime.get("title").asText();
+                                    if ((queryTitle == null || queryTitle.isBlank()) && anime.has("attributes") && anime.get("attributes").has("canonicalTitle")) queryTitle = anime.get("attributes").get("canonicalTitle").asText();
+                                    if ((queryTitle == null || queryTitle.isBlank()) && anime.has("titles") && anime.get("titles").isArray() && anime.get("titles").size() > 0) {
+                                        JsonNode first = anime.get("titles").get(0);
+                                        if (first.has("title")) queryTitle = first.get("title").asText();
+                                    }
+                                } catch (Exception e) {
+                                    // ignore
+                                }
+
+                                if (queryTitle == null || queryTitle.isBlank()) {
+                                    // Si on n'a aucun titre, conserver l'anime pour être conservateur
+                                    filteredData.add(anime);
+                                    totalFetched++;
+                                    continue;
+                                }
+
+                                boolean hasProviders = false;
+                                try {
+                                    // Résoudre sur TMDB et vérifier providers pour ce pays
+                                    JsonNode resolved = resolveTmdbCandidates(queryTitle, null, country);
+                                    if (resolved != null && resolved.has("best") && !resolved.get("best").isNull() && resolved.get("best").has("id")) {
+                                        String bestId = resolved.get("best").get("id").asText();
+                                        String mediaType = resolved.get("best").has("media_type") ? resolved.get("best").get("media_type").asText() : "tv";
+                                        JsonNode providers = fetchTmdbWatchProviders(bestId, mediaType);
+                                        if (providers != null && providers.has("results") && providers.get("results").has(country)) {
+                                            JsonNode countryNode = providers.get("results").get(country);
+                                            if (countryNode != null) {
+                                                String[] keys = new String[]{"flatrate", "free", "buy", "rent"};
+                                                for (String k : keys) {
+                                                    if (countryNode.has(k) && countryNode.get(k).isArray() && countryNode.get(k).size() > 0) {
+                                                        hasProviders = true; break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (Exception rex) {
+                                    System.err.println("⚠️ Provider check failed for '" + queryTitle + "' country=" + country + " -> " + rex.getMessage());
+                                    // En cas d'erreur lors de la résolution, conserver l'anime (comportement conservateur)
+                                    hasProviders = true;
+                                }
+
+                                if (!hasProviders) {
+                                    System.out.println("↩️ Skipping anime '" + (queryTitle == null ? "?" : queryTitle) + "' for country " + country + " (no English title and no providers)");
+                                    continue; // ne pas ajouter cet anime
+                                }
+                            }
+
+                            // Si on arrive ici, soit c'est le Japon, soit on a un titre anglais, soit on a des providers
                             filteredData.add(anime);
                             totalFetched++;
                             if (anime.has("title")) System.out.println("✅ " + anime.get("title").asText());
@@ -271,6 +437,12 @@ public class AnimeDataService {
                 if (data.isArray()) {
                     for (JsonNode anime : data) {
                         ((ObjectNode) anime).put("country", country);
+                        // Enrichir descriptions localisées pour le calendrier également
+                        try {
+                            enrichLocalizedDescriptions((ObjectNode) anime);
+                        } catch (Exception e) {
+                            System.err.println("⚠️ Enrichissement localisation calendrier failed: " + e.getMessage());
+                        }
                     }
                 }
                 
@@ -330,7 +502,8 @@ public class AnimeDataService {
         try {
             // Utiliser l'endpoint schedules de Jikan pour obtenir les sorties du jour
             // Jikan retourne les animes qui sortent par jour de la semaine
-            String today = java.time.LocalDate.now().getDayOfWeek().name().toLowerCase();
+            // Aligner la logique de "today" sur JST pour correspondre aux jours Jikan
+            String today = java.time.LocalDate.now(ZoneId.of("Asia/Tokyo")).getDayOfWeek().name().toLowerCase();
             
             System.out.println("📅 Récupération des sorties pour: " + today);
             
@@ -434,22 +607,79 @@ public class AnimeDataService {
     /**
      * Récupérer les plateformes de streaming pour un anime spécifique
      */
-    @Cacheable(value = "animeDetails", key = "'platforms_' + #animeId + '_' + #country")
-    public JsonNode getStreamingPlatforms(String animeId, String country) {
+    @Cacheable(value = "animeDetails", key = "'platforms_' + #animeId + '_' + #country + '_' + #providedTmdbId")
+    public JsonNode getStreamingPlatforms(String animeId, String country, String providedTmdbId) {
         try {
-            // 1) Récupérer le titre via Kitsu (fallback si nécessaire)
+            // 1) PRIORITÉ: récupérer le titre via Jikan si l'identifiant est numérique (mal_id)
+            String title = null;
             String kitsuResp = null;
-            // Si l'identifiant fourni est numérique, tenter /anime/{id}, sinon considérer que c'est un titre/slug et faire une recherche
+
             if (animeId != null && animeId.matches("^\\d+$")) {
+                // Try Jikan /anime/{mal_id} to get the authoritative title
                 try {
-                    kitsuResp = kitsuClient.get()
+                    String jikanResp = jikanClient.get()
                             .uri("/anime/{id}", animeId)
                             .retrieve()
                             .bodyToMono(String.class)
                             .block();
+                    if (jikanResp != null) {
+                        JsonNode jikanJson = objectMapper.readTree(jikanResp);
+                        JsonNode candidate = jikanJson;
+                        // Jikan sometimes wraps data or returns object directly
+                        if (jikanJson.has("data")) candidate = jikanJson.get("data");
+
+                        if (candidate.has("title_english") && !candidate.get("title_english").isNull() && !candidate.get("title_english").asText().isBlank()) {
+                            title = candidate.get("title_english").asText();
+                        } else if (candidate.has("title") && !candidate.get("title").isNull()) {
+                            title = candidate.get("title").asText();
+                        } else if (candidate.has("titles") && candidate.get("titles").isArray() && candidate.get("titles").size() > 0) {
+                            // iterate titles array and prefer English or Default
+                            for (JsonNode t : candidate.get("titles")) {
+                                if (t.has("type") && t.has("title")) {
+                                    String type = t.get("type").asText().toLowerCase();
+                                    if (type.contains("english") || "default".equals(type)) {
+                                        title = t.get("title").asText();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if (title != null && !title.isBlank()) {
+                            System.out.println("🌐 Using Jikan title for id=" + animeId + " -> '" + title + "'");
+                        }
+                    }
                 } catch (Exception e) {
-                    // Si l'id direct ne fonctionne pas, tenter une recherche Kitsu par texte
-                    System.err.println("⚠️ Kitsu /anime/{id} failed for '" + animeId + "' -> trying search fallback");
+                    System.err.println("⚠️ Jikan /anime/{id} failed for '" + animeId + "': " + e.getMessage());
+                }
+            }
+
+            // 2) Si pas de titre obtenu via Jikan, retomber sur Kitsu (id or search)
+            if (title == null || title.isBlank()) {
+                if (animeId != null && animeId.matches("^\\d+$")) {
+                    try {
+                        kitsuResp = kitsuClient.get()
+                                .uri("/anime/{id}", animeId)
+                                .retrieve()
+                                .bodyToMono(String.class)
+                                .block();
+                    } catch (Exception e) {
+                        System.err.println("⚠️ Kitsu /anime/{id} failed for '" + animeId + "' -> trying search fallback");
+                        try {
+                            String searchResp = kitsuClient.get()
+                                    .uri(uriBuilder -> uriBuilder.path("/anime")
+                                            .queryParam("filter[text]", animeId)
+                                            .queryParam("page[limit]", 1)
+                                            .build())
+                                    .retrieve()
+                                    .bodyToMono(String.class)
+                                    .block();
+                            kitsuResp = searchResp;
+                        } catch (Exception ex) {
+                            System.err.println("❌ Kitsu fallback search failed: " + ex.getMessage());
+                        }
+                    }
+                } else {
+                    // L'identifiant n'est pas numérique: le traiter comme un titre et faire une recherche immédiatement
                     try {
                         String searchResp = kitsuClient.get()
                                 .uri(uriBuilder -> uriBuilder.path("/anime")
@@ -461,52 +691,29 @@ public class AnimeDataService {
                                 .block();
                         kitsuResp = searchResp;
                     } catch (Exception ex) {
-                        System.err.println("❌ Kitsu fallback search failed: " + ex.getMessage());
+                        System.err.println("❌ Kitsu search failed for title '" + animeId + "': " + ex.getMessage());
                     }
                 }
-            } else {
-                // L'identifiant n'est pas numérique: le traiter comme un titre et faire une recherche immédiatement
-                try {
-                    String searchResp = kitsuClient.get()
-                            .uri(uriBuilder -> uriBuilder.path("/anime")
-                                    .queryParam("filter[text]", animeId)
-                                    .queryParam("page[limit]", 1)
-                                    .build())
-                            .retrieve()
-                            .bodyToMono(String.class)
-                            .block();
-                    kitsuResp = searchResp;
-                } catch (Exception ex) {
-                    System.err.println("❌ Kitsu search failed for title '" + animeId + "': " + ex.getMessage());
-                }
-            }
 
-            String title = null;
-            if (kitsuResp != null) {
-                JsonNode kitsuJson = objectMapper.readTree(kitsuResp);
-                if (kitsuJson.has("data") && kitsuJson.get("data").has("attributes")) {
-                    JsonNode attrs = kitsuJson.get("data").get("attributes");
-                    if (attrs.has("titles") && attrs.get("titles").has("en")) {
-                        title = attrs.get("titles").get("en").asText();
-                    } else if (attrs.has("canonicalTitle")) {
-                        title = attrs.get("canonicalTitle").asText();
-                    }
-                }
-            }
-
-            if (title == null || title.isBlank()) {
-                // Tenter d'extraire un mal_id ou slug depuis la réponse Kitsu si possible
-                try {
-                    if (kitsuResp != null) {
-                        JsonNode kitsuJson2 = objectMapper.readTree(kitsuResp);
-                        if (kitsuJson2.has("data") && kitsuJson2.get("data").isArray() && kitsuJson2.get("data").size() > 0) {
-                            JsonNode first = kitsuJson2.get("data").get(0).get("attributes");
+                if (kitsuResp != null) {
+                    try {
+                        JsonNode kitsuJson = objectMapper.readTree(kitsuResp);
+                        if (kitsuJson.has("data") && kitsuJson.get("data").has("attributes")) {
+                            JsonNode attrs = kitsuJson.get("data").get("attributes");
+                            if (attrs.has("titles") && attrs.get("titles").
+                                    has("en")) {
+                                title = attrs.get("titles").get("en").asText();
+                            } else if (attrs.has("canonicalTitle")) {
+                                title = attrs.get("canonicalTitle").asText();
+                            }
+                        } else if (kitsuJson.has("data") && kitsuJson.get("data").isArray() && kitsuJson.get("data").size() > 0) {
+                            JsonNode first = kitsuJson.get("data").get(0).get("attributes");
                             if (first != null && first.has("canonicalTitle")) {
                                 title = first.get("canonicalTitle").asText();
                             }
                         }
-                    }
-                } catch (Exception ignored) {}
+                    } catch (Exception ignored) {}
+                }
 
                 if (title == null || title.isBlank()) {
                     // Fallback minimal: utiliser l'animeId comme titre pour éviter NullPointer
@@ -517,8 +724,18 @@ public class AnimeDataService {
             // 2) Rechercher sur TMDB (multi-type: tv / movie) pour obtenir un TMDB id
             // Rendre le titre final/effectively final pour utilisation sûre dans les lambdas
             final String queryTitle = title;
-            var tmdbResult = searchTmdbForTitle(queryTitle);
-            System.out.println("🔎 TMDB search for title='" + queryTitle + "' returned: " + (tmdbResult != null ? tmdbResult.toString().substring(0, Math.min(200, tmdbResult.toString().length())) : "null"));
+            JsonNode tmdbResult = null;
+            if (providedTmdbId != null && !providedTmdbId.isBlank()) {
+                // If client provided a resolved TMDB id, use it (assume media_type=tv as default)
+                ObjectNode tmp = objectMapper.createObjectNode();
+                tmp.put("id", providedTmdbId);
+                tmp.put("media_type", "tv");
+                tmdbResult = tmp;
+                System.out.println("🔎 Using provided TMDB id='" + providedTmdbId + "' for title='" + queryTitle + "'");
+            } else {
+                tmdbResult = searchTmdbForTitle(queryTitle);
+                System.out.println("🔎 TMDB search for title='" + queryTitle + "' returned: " + (tmdbResult != null ? tmdbResult.toString().substring(0, Math.min(200, tmdbResult.toString().length())) : "null"));
+            }
 
             // 3) Si on a un TMDB id, récupérer les watch/providers
             ObjectNode finalResult = objectMapper.createObjectNode();
@@ -564,6 +781,63 @@ public class AnimeDataService {
                                     String normalized = normalizeProviderName(rawName);
                                     node.put("normalized_name", normalized);
 
+                                    // Générer un lien utilisateur-friendly vers la plateforme (si possible)
+                                    try {
+                                        String encodedTitle = URLEncoder.encode(queryTitle, StandardCharsets.UTF_8.toString());
+                                        String providerLink = null;
+                                        String lname = normalized == null ? "" : normalized.toLowerCase();
+                                        switch (lname) {
+                                            case "crunchyroll":
+                                                // Crunchyroll search page is JS-heavy and its query parameter may not always work
+                                                // Use a site-specific Google search to reliably surface the anime page/results
+                                                providerLink = "https://www.google.com/search?q=site:crunchyroll.com+" + encodedTitle;
+                                                break;
+                                            case "netflix":
+                                                providerLink = "https://www.netflix.com/search?q=" + encodedTitle;
+                                                break;
+                                            case "prime video":
+                                                providerLink = "https://www.primevideo.com/search/ref=atv_nb_sr?phrase=" + encodedTitle;
+                                                break;
+                                            case "hulu":
+                                                providerLink = "https://www.hulu.com/search?q=" + encodedTitle;
+                                                break;
+                                            case "funimation":
+                                                providerLink = "https://www.funimation.com/search/?q=" + encodedTitle;
+                                                break;
+                                            case "disney+":
+                                            case "disney plus":
+                                                providerLink = "https://www.disneyplus.com/search/" + encodedTitle;
+                                                break;
+                                            case "adn":
+                                            case "anime-digital-network":
+                                                providerLink = "https://www.adnanime.com/recherche/?q=" + encodedTitle;
+                                                break;
+                                            case "hidive":
+                                                providerLink = "https://www.hidive.com/search?q=" + encodedTitle;
+                                                break;
+                                            case "hbo max":
+                                                providerLink = "https://www.hbomax.com/search?q=" + encodedTitle;
+                                                break;
+                                            case "paramount+":
+                                            case "paramount plus":
+                                                providerLink = "https://www.paramountplus.com/search/?q=" + encodedTitle;
+                                                break;
+                                            default:
+                                                providerLink = null;
+                                        }
+
+                                        if (providerLink != null) {
+                                            node.put("link", providerLink);
+                                        } else if (p.has("provider_id") && p.get("provider_id").isNumber()) {
+                                            node.put("link", "https://www.themoviedb.org/provider/" + p.get("provider_id").asText());
+                                        } else {
+                                            // Fallback generic search
+                                            node.put("link", "https://www.google.com/search?q=" + URLEncoder.encode(queryTitle + " " + rawName, StandardCharsets.UTF_8.toString()));
+                                        }
+                                    } catch (Exception ex) {
+                                        // ignore link generation errors
+                                    }
+
                                     String dedupeKey = (normalized == null ? "" : normalized.toLowerCase()) + "|" + countryCode.toUpperCase();
                                     if (seenProviders.contains(dedupeKey)) {
                                         System.out.println("⚠️ Duplicate provider skipped: " + normalized + " for country " + countryCode + " (title='" + queryTitle + "')");
@@ -589,6 +863,73 @@ public class AnimeDataService {
             System.out.println("🔔 Providers collected: " + providersArray.size() + " for title='" + queryTitle + "' (country filter='" + (country == null ? "" : country) + "')");
             if (providersArray.size() == 0) {
                 System.out.println("⚠️ No providers found for title='" + queryTitle + "' (tmdbResult=" + (tmdbResult == null ? "null" : tmdbResult.toString()) + ")");
+            }
+            // Heuristique supplémentaire : si Crunchyroll n'est pas présent mais Jikan indique Crunchyroll
+            try {
+                boolean hasCrunchy = false;
+                for (JsonNode n : providersArray) {
+                    String norm = n.has("normalized_name") ? n.get("normalized_name").asText("") : "";
+                    if (norm != null && norm.equalsIgnoreCase("Crunchyroll")) {
+                        hasCrunchy = true;
+                        break;
+                    }
+                }
+
+                if (!hasCrunchy && animeId != null && animeId.matches("^\\d+$")) {
+                    try {
+                        String jresp = jikanClient.get()
+                                .uri("/anime/{id}", animeId)
+                                .retrieve()
+                                .bodyToMono(String.class)
+                                .block();
+                        if (jresp != null) {
+                            JsonNode jjson = objectMapper.readTree(jresp);
+                            JsonNode candidate = jjson;
+                            if (jjson.has("data")) candidate = jjson.get("data");
+                            // Inspect producers / licensors for Crunchyroll
+                            boolean crunchyFound = false;
+                            if (candidate.has("producers") && candidate.get("producers").isArray()) {
+                                for (JsonNode p : candidate.get("producers")) {
+                                    String pname = p.has("name") ? p.get("name").asText("") : "";
+                                    if (pname.toLowerCase().contains("crunchy")) { crunchyFound = true; break; }
+                                }
+                            }
+                            if (!crunchyFound && candidate.has("licensors") && candidate.get("licensors").isArray()) {
+                                for (JsonNode p : candidate.get("licensors")) {
+                                    String pname = p.has("name") ? p.get("name").asText("") : "";
+                                    if (pname.toLowerCase().contains("crunchy")) { crunchyFound = true; break; }
+                                }
+                            }
+
+                            if (crunchyFound) {
+                                // Create a provider node for Crunchyroll
+                                ObjectNode node = objectMapper.createObjectNode();
+                                node.put("provider_name", "Crunchyroll");
+                                node.put("provider_id", -1);
+                                node.put("display_priority", 1);
+                                node.put("country", country == null ? "" : country);
+                                node.put("type", "flatrate");
+                                node.put("normalized_name", "Crunchyroll");
+                                try {
+                                    String encodedTitle = URLEncoder.encode(queryTitle, StandardCharsets.UTF_8.toString());
+                                    node.put("link", "https://www.google.com/search?q=site:crunchyroll.com+" + encodedTitle);
+                                } catch (Exception ex) {
+                                    node.put("link", "https://www.google.com/search?q=" + URLEncoder.encode(queryTitle, StandardCharsets.UTF_8.toString()));
+                                }
+                                String dedupeKey = "crunchyroll|" + (country == null ? "" : country.toUpperCase());
+                                if (!seenProviders.contains(dedupeKey)) {
+                                    providersArray.add(node);
+                                    seenProviders.add(dedupeKey);
+                                    System.out.println("➕ Heuristic: added Crunchyroll provider based on Jikan producers/licensors for title='" + queryTitle + "'");
+                                }
+                            }
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("⚠️ Heuristic Crunchyroll check failed: " + ex.getMessage());
+                    }
+                }
+            } catch (Exception ex) {
+                // Non-blocking heuristic failure
             }
             // exposer le titre utilisé
             finalResult.put("query_title", queryTitle);
@@ -645,26 +986,206 @@ public class AnimeDataService {
     }
 
     /**
-     * Récupère les watch/providers depuis TMDB pour un media id
+     * Méthode publique de debug: cherche sur TMDB et renvoie le premier résultat (raw)
      */
-    private JsonNode fetchTmdbWatchProviders(String tmdbId, String mediaType) {
-        try {
-            String path = "/" + ("movie".equals(mediaType) ? "movie" : "tv") + "/" + tmdbId + "/watch/providers";
-        if (this.tmdbApiKey == null || this.tmdbApiKey.isBlank()) {
-        System.err.println("⚠️ TMDB API key missing - skipping fetchTmdbWatchProviders for id: " + tmdbId);
-        return null;
-        }
+    public JsonNode debugSearchTmdb(String title) {
+        return searchTmdbForTitle(title);
+    }
 
-        String resp = tmdbClient.get()
-            .uri(uriBuilder -> uriBuilder.path(path)
-                .queryParam("api_key", this.tmdbApiKey)
-                .build())
+    /**
+     * Méthode publique de debug: cherche sur TMDB pour le titre puis récupère les providers
+     */
+    public JsonNode debugTmdbProviders(String title, String country) {
+        try {
+            JsonNode search = searchTmdbForTitle(title);
+            ObjectNode out = objectMapper.createObjectNode();
+            out.set("search", search == null ? objectMapper.nullNode() : search);
+            if (search != null && search.has("id")) {
+                String tmdbId = search.get("id").asText();
+                String mediaType = search.has("media_type") ? search.get("media_type").asText() : "tv";
+                JsonNode providers = fetchTmdbWatchProviders(tmdbId, mediaType);
+                out.set("providers", providers == null ? objectMapper.nullNode() : providers);
+            } else {
+                out.put("providers", (String) null);
+            }
+            out.put("query", title);
+            out.put("country", country == null ? "" : country);
+            return out;
+        } catch (Exception e) {
+            System.err.println("❌ debugTmdbProviders failed: " + e.getMessage());
+            ObjectNode err = objectMapper.createObjectNode();
+            err.put("error", e.getMessage());
+            return err;
+        }
+    }
+
+    /**
+     * Résoudre automatiquement le meilleur candidat TMDB pour un titre donné
+     * Retourne les topCandidates et le candidat sélectionné avec providers vérifiés
+     */
+    public JsonNode resolveTmdbCandidates(String title, Integer year, String country) {
+        try {
+            // 1) rechercher sur TMDB (multi)
+            String resp = tmdbClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/search/multi")
+                            .queryParam("api_key", this.tmdbApiKey)
+                            .queryParam("query", title)
+                            .queryParam("language", "fr-FR")
+                            .queryParam("page", 1)
+                            .build())
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
 
-            if (resp == null) return null;
-            return objectMapper.readTree(resp);
+            if (resp == null) {
+                ObjectNode out = objectMapper.createObjectNode();
+                out.put("error", "Empty TMDB response");
+                return out;
+            }
+
+            JsonNode searchJson = objectMapper.readTree(resp);
+            ArrayNode results = objectMapper.createArrayNode();
+            if (searchJson.has("results") && searchJson.get("results").isArray()) {
+                results = (ArrayNode) searchJson.get("results");
+            }
+
+            // Score each candidate
+            ArrayNode scored = objectMapper.createArrayNode();
+            for (JsonNode r : results) {
+                double score = 0.0;
+                String mediaType = r.has("media_type") ? r.get("media_type").asText("tv") : "tv";
+                if ("tv".equalsIgnoreCase(mediaType)) score += 40;
+                String origLang = r.has("original_language") ? r.get("original_language").asText("") : "";
+                if ("ja".equalsIgnoreCase(origLang)) score += 25;
+                String firstAir = r.has("first_air_date") ? r.get("first_air_date").asText("") : (r.has("release_date") ? r.get("release_date").asText("") : "");
+                if (year != null && firstAir != null && !firstAir.isBlank() && firstAir.startsWith(String.valueOf(year))) score += 30;
+                String overview = r.has("overview") ? r.get("overview").asText("") : "";
+                if (overview != null && overview.trim().length() > 20) score += 15;
+                double popularity = r.has("popularity") ? r.get("popularity").asDouble(0.0) : 0.0;
+                score += Math.min(20.0, popularity / 5.0);
+                int voteCount = r.has("vote_count") ? r.get("vote_count").asInt(0) : 0;
+                if (voteCount > 0) score += 5;
+
+                ObjectNode row = objectMapper.createObjectNode();
+                row.put("id", r.has("id") ? r.get("id").asLong() : -1);
+                row.put("media_type", mediaType);
+                row.put("name", r.has("name") ? r.get("name").asText() : (r.has("title") ? r.get("title").asText() : r.path("original_name").asText("")));
+                row.put("original_language", origLang);
+                row.put("first_air_date", firstAir == null ? "" : firstAir);
+                row.put("popularity", popularity);
+                row.put("vote_count", voteCount);
+                row.put("overview", overview == null ? "" : overview);
+                row.put("score", score);
+                scored.add(row);
+            }
+
+            // sort scored desc
+            List<JsonNode> list = new ArrayList<>();
+            scored.forEach(list::add);
+            list.sort((a, b) -> Double.compare(b.get("score").asDouble(0.0), a.get("score").asDouble(0.0)));
+
+            ArrayNode topCandidates = objectMapper.createArrayNode();
+            int limit = Math.min(5, list.size());
+            for (int i = 0; i < limit; i++) {
+                topCandidates.add(list.get(i));
+            }
+
+            // For top 3, fetch providers and boost if expected provider present (e.g., Crunchyroll)
+            for (int i = 0; i < Math.min(3, topCandidates.size()); i++) {
+                ObjectNode cand = (ObjectNode) topCandidates.get(i);
+                long tmdbId = cand.get("id").asLong(-1);
+                String mType = cand.get("media_type").asText("tv");
+                try {
+                    JsonNode providers = fetchTmdbWatchProviders(String.valueOf(tmdbId), mType);
+                    cand.set("providers_raw", providers == null ? objectMapper.nullNode() : providers);
+                    // check country
+                    if (providers != null && providers.has("results") && providers.get("results").has(country)) {
+                        JsonNode countryNode = providers.get("results").get(country);
+                        if (countryNode != null) {
+                            String[] keys = new String[]{"flatrate", "free", "buy", "rent"};
+                            for (String k : keys) {
+                                if (countryNode.has(k) && countryNode.get(k).isArray()) {
+                                    for (JsonNode p : countryNode.get(k)) {
+                                        String pname = p.has("provider_name") ? p.get("provider_name").asText("") : "";
+                                        if (pname.toLowerCase().contains("crunchy")) {
+                                            // big boost
+                                            double prev = cand.get("score").asDouble(0.0);
+                                            cand.put("score", prev + 50.0);
+                                            cand.put("provider_match", "Crunchyroll");
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (cand.has("provider_match")) break;
+                            }
+                        }
+                    }
+                } catch (Exception ex) {
+                    // ignore provider fetch errors
+                }
+            }
+
+            // Resort after provider boosts
+            List<JsonNode> finalList = new ArrayList<>();
+            topCandidates.forEach(finalList::add);
+            finalList.sort((a, b) -> Double.compare(b.get("score").asDouble(0.0), a.get("score").asDouble(0.0)));
+
+            ObjectNode out = objectMapper.createObjectNode();
+            out.put("query", title);
+            out.put("year", year == null ? -1 : year);
+            out.put("country", country == null ? "" : country);
+            ArrayNode outCandidates = objectMapper.createArrayNode();
+            for (JsonNode n : finalList) outCandidates.add(n);
+            out.set("topCandidates", outCandidates);
+            if (finalList.size() > 0) out.set("best", finalList.get(0));
+            else out.set("best", objectMapper.nullNode());
+
+            return out;
+        } catch (Exception e) {
+            System.err.println("❌ resolveTmdbCandidates failed: " + e.getMessage());
+            ObjectNode err = objectMapper.createObjectNode();
+            err.put("error", e.getMessage());
+            return err;
+        }
+    }
+
+    /**
+     * Récupère les watch/providers depuis TMDB pour un media id
+     */
+    private JsonNode fetchTmdbWatchProviders(String tmdbId, String mediaType) {
+        try {
+            if (this.tmdbApiKey == null || this.tmdbApiKey.isBlank()) {
+                System.err.println("⚠️ TMDB API key missing - skipping fetchTmdbWatchProviders for id: " + tmdbId);
+                return null;
+            }
+
+            // Helper to call TMDB providers endpoint for a given type without throwing
+            java.util.function.Function<String, JsonNode> callForType = (type) -> {
+                try {
+                    String path = "/" + ("movie".equals(type) ? "movie" : "tv") + "/" + tmdbId + "/watch/providers";
+                    String resp = tmdbClient.get()
+                            .uri(uriBuilder -> uriBuilder.path(path)
+                                    .queryParam("api_key", this.tmdbApiKey)
+                                    .build())
+                            .retrieve()
+                            .bodyToMono(String.class)
+                            .block();
+                    if (resp == null) return null;
+                    return objectMapper.readTree(resp);
+                } catch (Exception e) {
+                    // Return null on any error to allow fallback attempts
+                    return null;
+                }
+            };
+
+            // Try requested mediaType first
+            JsonNode providers = callForType.apply(mediaType);
+            if (providers != null) return providers;
+
+            // If nothing, try the other type (tv <-> movie)
+            String other = "movie".equalsIgnoreCase(mediaType) ? "tv" : "movie";
+            providers = callForType.apply(other);
+            return providers;
         } catch (Exception e) {
             System.err.println("❌ Erreur TMDB watch/providers: " + e.getMessage());
             return null;
@@ -689,6 +1210,128 @@ public class AnimeDataService {
         if (r.contains("paramount")) return "Paramount+";
         // Fallback: capitaliser
         return raw.trim();
+    }
+
+    /**
+     * Enrichit un noeud Anime avec des champs description_en et description_fr si possibles.
+     * Priorité: Jikan/Kitsu attributes -> TMDB translations (si clé présente) -> fallback sur synopsis.
+     */
+    private void enrichLocalizedDescriptions(ObjectNode animeNode) {
+        try {
+            String descEn = null;
+            String descFr = null;
+
+            // 1) Si Jikan fournit 'synopsis' et éventuellement des traductions
+            if (animeNode.has("synopsis") && !animeNode.get("synopsis").isNull()) {
+                descEn = animeNode.get("synopsis").asText();
+            }
+
+            // 2) Si structure Kitsu-like présente (attributes.titles / attributes.synopsis)
+            if (animeNode.has("attributes")) {
+                JsonNode attrs = animeNode.get("attributes");
+                if (attrs.has("synopsis") && !attrs.get("synopsis").isNull()) {
+                    // Kitsu synopsis often in English
+                    descEn = attrs.get("synopsis").asText();
+                }
+                // Kitsu may have localized descriptions under 'description' keys or translations
+                if (attrs.has("description") && attrs.get("description").isObject()) {
+                    JsonNode descObj = attrs.get("description");
+                    if (descObj.has("en")) descEn = descObj.get("en").asText();
+                    if (descObj.has("fr")) descFr = descObj.get("fr").asText();
+                }
+                if (attrs.has("titles") && attrs.get("titles").has("en")) {
+                    // nothing special, keep title
+                }
+            }
+
+            // 3) If TMDB API is available, try to fetch translations for french
+            if ((descFr == null || descFr.isBlank()) && this.tmdbApiKey != null && !this.tmdbApiKey.isBlank()) {
+                try {
+                    var translations = fetchTmdbTranslations(animeNode);
+                    if (translations != null) {
+                        if (translations.has("fr") && translations.get("fr").has("overview")) {
+                            descFr = translations.get("fr").get("overview").asText();
+                        }
+                        if ((descEn == null || descEn.isBlank()) && translations.has("en") && translations.get("en").has("overview")) {
+                            descEn = translations.get("en").get("overview").asText();
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("⚠️ TMDB translations fetch failed: " + e.getMessage());
+                }
+            }
+
+            // 4) Fallbacks
+            if ((descEn == null || descEn.isBlank()) && animeNode.has("title") && animeNode.get("title") != null) {
+                descEn = "Résumé non disponible pour " + animeNode.get("title").asText();
+            }
+            if (descFr == null || descFr.isBlank()) {
+                // Try simple auto-translate placeholder (do not call external service here)
+                if (descEn != null && !descEn.isBlank()) {
+                    // Mark as untranslated but provide English as fallback for fr
+                    descFr = descEn; // front pourra indiquer que c'est un fallback
+                } else {
+                    descFr = "Résumé non disponible";
+                }
+            }
+
+            animeNode.put("description_en", descEn != null ? descEn : "");
+            animeNode.put("description_fr", descFr != null ? descFr : "");
+        } catch (Exception e) {
+            System.err.println("❌ enrichLocalizedDescriptions failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Tente d'extraire un TMDB media id via search (si possible) et récupère les traductions (titles/overview)
+     * Retourne un ObjectNode mappé par languageCode -> {overview:..., title:...}
+     */
+    private JsonNode fetchTmdbTranslations(ObjectNode animeNode) {
+        try {
+            String possibleTitle = null;
+            if (animeNode.has("title") && !animeNode.get("title").isNull()) possibleTitle = animeNode.get("title").asText();
+            if (possibleTitle == null && animeNode.has("attributes") && animeNode.get("attributes").has("canonicalTitle")) {
+                possibleTitle = animeNode.get("attributes").get("canonicalTitle").asText();
+            }
+            if (possibleTitle == null || possibleTitle.isBlank()) return null;
+
+            if (this.tmdbApiKey == null || this.tmdbApiKey.isBlank()) return null;
+
+            JsonNode search = searchTmdbForTitle(possibleTitle);
+            if (search == null || !search.has("id")) return null;
+            String tmdbId = search.get("id").asText();
+            String mediaType = search.has("media_type") ? search.get("media_type").asText() : "tv";
+
+            String resp = tmdbClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/" + ("movie".equals(mediaType) ? "movie" : "tv") + "/{id}/translations")
+                            .queryParam("api_key", this.tmdbApiKey)
+                            .build(tmdbId))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            if (resp == null) return null;
+            JsonNode translations = objectMapper.readTree(resp);
+            // TMDB translations -> structure: { translations: [ { iso_3166_1, iso_639_1, data: { title, overview } }, ... ] }
+            ObjectNode out = objectMapper.createObjectNode();
+            if (translations.has("translations") && translations.get("translations").isArray()) {
+                for (JsonNode tr : translations.get("translations")) {
+                    if (tr.has("iso_639_1") && tr.has("data")) {
+                        String lang = tr.get("iso_639_1").asText();
+                        JsonNode data = tr.get("data");
+                        ObjectNode v = objectMapper.createObjectNode();
+                        if (data.has("overview")) v.put("overview", data.get("overview").asText());
+                        if (data.has("title")) v.put("title", data.get("title").asText());
+                        out.set(lang, v);
+                    }
+                }
+            }
+
+            return out;
+        } catch (Exception e) {
+            System.err.println("❌ fetchTmdbTranslations failed: " + e.getMessage());
+            return null;
+        }
     }
     
     /**

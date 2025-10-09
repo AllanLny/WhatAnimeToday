@@ -1,15 +1,13 @@
-import React from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { UserProvider } from './context/UserContext';
-
-// Import du nouveau design 2025
-import Home from './pages/Home/Home';
-import WeeklyCalendar from './pages/Calendar/WeeklyCalendar';
-import Settings from './pages/Settings/Settings';
-
 import './App.scss';
+
+// Code-splitting: lazy load pages to reduce initial bundle
+const Home = React.lazy(() => import('./pages/Home/Home'));
+const WeeklyCalendar = React.lazy(() => import('./pages/Calendar/WeeklyCalendar'));
+const Settings = React.lazy(() => import('./pages/Settings/Settings'));
 
 // Configuration React Query optimisée
 const queryClient = new QueryClient({
@@ -25,23 +23,31 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  const [Devtools, setDevtools] = useState(null);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      import('@tanstack/react-query-devtools').then(mod => setDevtools(() => mod.ReactQueryDevtools)).catch(() => {});
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <UserProvider>
         <Router>
           <div className="app">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/calendar" element={<WeeklyCalendar />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/watchlist" element={<div>Watchlist (à venir)</div>} />
-              <Route path="/trending" element={<div>Tendances (à venir)</div>} />
-            </Routes>
+            <Suspense fallback={<div />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/calendar" element={<WeeklyCalendar />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/watchlist" element={<div>Watchlist (à venir)</div>} />
+                <Route path="/trending" element={<div>Tendances (à venir)</div>} />
+              </Routes>
+            </Suspense>
           </div>
         </Router>
-        
-        {/* React Query DevTools (dev only) */}
-        <ReactQueryDevtools initialIsOpen={false} />
+        {Devtools ? <Devtools initialIsOpen={false} /> : null}
       </UserProvider>
     </QueryClientProvider>
   );
