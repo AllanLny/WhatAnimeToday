@@ -3,6 +3,9 @@
 // === Modern Anime Card 2025 === //
 
 .anime-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background: vars.color('bg-card');
   border: 1px solid vars.color('border-light');
   border-radius: vars.radius('2xl');
@@ -40,11 +43,16 @@
   // Image container
   .anime-image {
     position: relative;
-    aspect-ratio: 16/9;
+    /* force a consistent image box; cards will size via grid-auto-rows */
+    width: 100%;
+    padding-top: calc(100% * 3 / 2); /* 2/3 aspect ratio -> padding-top 150% to reserve space */
     overflow: hidden;
     background: linear-gradient(135deg, vars.color('bg-secondary') 0%, vars.color('bg-tertiary') 100%);
     
     img {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -146,10 +154,12 @@
         color: vars.color('text-primary');
         line-height: 1.3;
         margin-bottom: vars.spacing('xs');
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
+  display: -webkit-box;
+  display: box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
         
         &:hover {
           color: vars.color('primary');
@@ -262,10 +272,12 @@
       font-size: vars.font-size('sm');
       color: vars.color('text-secondary');
       line-height: 1.5;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+  display: -webkit-box;
+  display: box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
       margin-bottom: vars.spacing('md');
     }
     
@@ -325,11 +337,21 @@
     
     .anime-title {
       font-size: vars.font-size('base');
+      display: -webkit-box;
+      display: box;
+      -webkit-box-orient: vertical;
       -webkit-line-clamp: 1;
+      line-clamp: 1;
+      overflow: hidden;
     }
     
     .anime-synopsis {
+      display: -webkit-box;
+      display: box;
+      -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
     }
   }
 }

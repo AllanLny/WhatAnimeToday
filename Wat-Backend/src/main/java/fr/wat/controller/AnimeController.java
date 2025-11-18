@@ -220,22 +220,23 @@ public class AnimeController {
      */
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getGlobalStats(
-            @RequestParam(required = false, defaultValue = "FR") String country) {
+        @RequestParam(required = false, defaultValue = "") String country) {
         
         try {
             System.out.println("📊 Requête statistiques pour le pays: " + country);
-            
-            Map<String, Object> stats = animeDataService.getGlobalStats(country);
-            
+            // Use StatisticsService which computes and caches global stats reliably
+            var statsDto = statisticsService.getGlobalStats(country == null ? "" : country);
+
             Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("country", country);
-            response.put("todayReleases", stats.get("todayReleases"));
-            response.put("totalAnimes", stats.get("totalAnimes"));
-            response.put("activeWeek", stats.get("activeWeek"));
-            response.put("totalEpisodes", stats.get("totalEpisodes"));
+            response.put("success", statsDto != null && statsDto.isSuccess());
+            response.put("country", statsDto == null ? country : statsDto.getCountry());
+            response.put("todayReleases", statsDto == null ? 0 : statsDto.getTodayReleases());
+            response.put("totalAnimes", statsDto == null ? 0 : statsDto.getTotalAnimes());
+            response.put("activeWeek", statsDto == null ? 0 : statsDto.getActiveWeek());
+            response.put("totalEpisodes", statsDto == null ? 0 : statsDto.getTotalEpisodes());
+            response.put("lastUpdated", statsDto == null ? LocalDateTime.now().toString() : statsDto.getLastUpdated());
             response.put("timestamp", LocalDateTime.now());
-            
+
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {

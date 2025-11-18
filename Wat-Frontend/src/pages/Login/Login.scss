@@ -1,0 +1,27 @@
+@use '../../variables' as vars;
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 64px);
+  padding: vars.spacing('lg');
+
+  .login-card {
+    max-width: 560px;
+    width: 100%;
+    background: rgba(18,18,18,0.95);
+    border: 1px solid rgba(255,255,255,0.03);
+    padding: vars.spacing('lg');
+    border-radius: vars.radius('lg');
+    box-shadow: vars.shadow('lg');
+
+    h1 { margin: 0 0 vars.spacing('sm') 0; }
+    p { color: vars.color('text-secondary'); margin-bottom: vars.spacing('md'); }
+
+    .login-actions { display:flex; gap: vars.spacing('md'); align-items:center; }
+
+    .btn-discord { background: linear-gradient(90deg,#5865F2,#4752C4); color:white; padding:10px 16px; border-radius:8px; border:none; cursor:pointer; }
+    .btn-ghost { background:transparent; color:vars.color('text-secondary'); border:1px solid rgba(255,255,255,0.03); padding:8px 12px; border-radius:8px; text-decoration:none; }
+  }
+}

@@ -24,6 +24,14 @@ function buildBackendUrl(endpoint, params = {}) {
   return url.toString();
 }
 
+// Normalise la valeur du pays pour les appels backend: 'WW' -> undefined (worldwide)
+function normalizeCountryParam(country) {
+  if (!country) return country;
+  const c = country.toString().toUpperCase();
+  if (c === 'WW' || c === 'WORLDWIDE' || c === 'ALL') return undefined;
+  return country;
+}
+
 // Fonction helper pour générer les informations de streaming
 // Streaming availability is now fetched from backend; local simulator removed.
 
@@ -90,26 +98,47 @@ export const useTodayReleases = (options = {}) => {
     enabled,
     queryFn: async () => {
       try {
-        const url = buildBackendUrl('/api/anime/today', { country });
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error(`Erreur HTTP: ${response.status}`);
+        const isWorldwide = normalizeCountryParam(country) === undefined;
+
+        let animesArray = [];
+
+        if (isWorldwide) {
+          // Fetch aggregated data for all countries from backend
+          const url = buildBackendUrl('/api/anime/today/all-countries');
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+          const data = await response.json();
+          if (!data) throw new Error('Empty response for all countries');
+          // data is a map { FR: [...], US: [...], ... }
+          const map = data.data || data || {};
+          const seen = new Set();
+          // Flatten and dedupe by mal_id if present or title
+          Object.values(map).forEach(countryNode => {
+            const list = Array.isArray(countryNode) ? countryNode : (countryNode?.data || []);
+            list.forEach(anime => {
+              const key = anime.mal_id || anime.id || anime.title || anime.canonicalTitle || '';
+              if (!key) return;
+              if (!seen.has(String(key))) {
+                seen.add(String(key));
+                animesArray.push(anime);
+              }
+            });
+          });
+        } else {
+          const url = buildBackendUrl('/api/anime/today', { country: normalizeCountryParam(country) });
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Erreur HTTP: ${response.status}`);
+          }
+          const data = await response.json();
+          if (!data.success) {
+            throw new Error(data.error || 'Erreur lors de la récupération des données');
+          }
+          animesArray = data.data.data || [];
         }
-        
-        const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.error || 'Erreur lors de la récupération des données');
-        }
-        
-  if (import.meta.env.DEV) console.log('📊 Données brutes du backend:', data);
-        
-        // Les données viennent maintenant de Jikan (via le backend) et sont déjà au bon format
-        const animesArray = data.data.data || []; // data.data.data car le backend structure ses réponses comme {success, data: jikanResponse}
-        
-  if (import.meta.env.DEV) console.log('🎌 Animes bruts depuis Jikan:', animesArray);
-        
+
+  if (import.meta.env.DEV) console.log('📊 Données brutes du backend:', animesArray);
+
         // Adapter le format Jikan API (qui est déjà au bon format) avec streamingInfo
   const formattedData = animesArray.map(anime => {
           if (import.meta.env.DEV) console.log('📝 Anime individuel:', anime);
@@ -182,7 +211,7 @@ export const useWeeklyReleases = (options = {}) => {
     enabled,
     queryFn: async () => {
       try {
-        const url = buildBackendUrl('/api/anime/weekly', { country });
+  const url = buildBackendUrl('/api/anime/weekly', { country: normalizeCountryParam(country) });
         const response = await fetch(url);
         
         if (!response.ok) {
@@ -218,8 +247,8 @@ export const useStreamingInfo = (animeId, country = 'FR', options = {}) => {
     queryFn: async () => {
       try {
         if (!animeId) return [];
-        const path = `/api/anime/anime/${encodeURIComponent(animeId)}/platforms`;
-        const url = buildBackendUrl(path, { country });
+  const path = `/api/anime/anime/${encodeURIComponent(animeId)}/platforms`;
+  const url = buildBackendUrl(path, { country: normalizeCountryParam(country) });
         const resp = await fetch(url, { headers: { Accept: 'application/json' } });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
@@ -246,8 +275,8 @@ export const useStreamingByTmdb = (tmdbId, country = 'FR', options = {}) => {
     queryFn: async () => {
       try {
         if (!tmdbId) return [];
-        const path = `/api/anime/tmdb/${encodeURIComponent(tmdbId)}/platforms`;
-        const url = buildBackendUrl(path, { country });
+  const path = `/api/anime/tmdb/${encodeURIComponent(tmdbId)}/platforms`;
+  const url = buildBackendUrl(path, { country: normalizeCountryParam(country) });
         const resp = await fetch(url, { headers: { Accept: 'application/json' } });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
@@ -275,8 +304,8 @@ export const useResolveTmdb = (title, year = null, country = 'FR', options = {})
         const params = {};
         params.q = title;
         if (year) params.year = year;
-        params.country = country;
-        const url = buildBackendUrl('/api/anime/tmdb/resolve', params);
+  params.country = normalizeCountryParam(country);
+  const url = buildBackendUrl('/api/anime/tmdb/resolve', params);
         const resp = await fetch(url);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const json = await resp.json();
@@ -302,31 +331,49 @@ export const useGlobalStats = (country = 'FR', options = {}) => {
     enabled,
     queryFn: async () => {
       try {
-        // Appel vers notre backend pour récupérer les statistiques
-        const response = await fetch(buildBackendUrl('/api/anime/stats', { country }));
-        
-        if (!response.ok) {
-          throw new Error(`Erreur HTTP: ${response.status}`);
+        const isWorldwide = normalizeCountryParam(country) === undefined;
+        if (isWorldwide) {
+          // Fetch all countries and compute aggregated stats client-side
+          const url = buildBackendUrl('/api/anime/today/all-countries');
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          const map = data.data || data || {};
+          let total = 0;
+          let totalEpisodes = 0;
+          Object.values(map).forEach(countryNode => {
+            const list = Array.isArray(countryNode) ? countryNode : (countryNode?.data || []);
+            total += list.length;
+            // approximate episodes if available
+            list.forEach(a => { if (a.episodes) totalEpisodes += a.episodes; });
+            // totalAnimes can be approximated by unique mal_id across countries
+          });
+          return {
+            todayReleases: total,
+            totalAnimes: 0,
+            activeWeek: 0,
+            totalEpisodes: totalEpisodes,
+            apiStatus: 'OK',
+            success: true
+          };
         }
-        
+
+        // Non-worldwide: existing behaviour
+        const response = await fetch(buildBackendUrl('/api/anime/stats', { country: normalizeCountryParam(country) }));
+        if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
         const result = await response.json();
-        console.log('📊 Réponse backend stats:', result);
-        
-        // Le backend retourne soit data.data soit directement data selon l'endpoint
         const data = result.data || result;
-        
         return {
           todayReleases: data.todayReleases || 0,
           totalAnimes: data.totalAnimes || 0,
-          activeWeek: data.activeWeek || 0, // Animes avec nouveaux épisodes cette semaine
-          totalEpisodes: data.totalEpisodes || 0, // Episodes sortis ce mois
-          apiStatus: data.apiStatus || 'OK', // État de l'API
-          success: data.success !== false // Par défaut true sauf si explicitement false
+          activeWeek: data.activeWeek || 0,
+          totalEpisodes: data.totalEpisodes || 0,
+          apiStatus: data.apiStatus || 'OK',
+          success: data.success !== false
         };
       } catch (error) {
         console.error('❌ Erreur lors de la récupération des stats:', error);
-        
-        // Fallback avec des données simulées réalistes basées sur le pays
+        // fallback previous behavior
         const countryMultiplier = {
           'FR': { base: 1.0, episodes: 850 },
           'US': { base: 1.3, episodes: 1100 },
@@ -336,15 +383,15 @@ export const useGlobalStats = (country = 'FR', options = {}) => {
           'ES': { base: 0.7, episodes: 600 },
           'IT': { base: 0.6, episodes: 520 }
         };
-        
+
         const multiplier = countryMultiplier[country] || countryMultiplier['FR'];
-        
+
         return {
-          todayReleases: Math.floor((Math.random() * 15 + 5) * multiplier.base), // 5-20 animes par jour
-          totalAnimes: Math.floor((1247 + Math.random() * 100) * multiplier.base), // Base + variation
-          activeWeek: Math.floor((Math.random() * 80 + 40) * multiplier.base), // 40-120 animes actifs par semaine  
-          totalEpisodes: Math.floor(multiplier.episodes + Math.random() * 200), // Episodes par mois avec variation
-          apiStatus: 'ERROR', // API en erreur, données de fallback
+          todayReleases: Math.floor((Math.random() * 15 + 5) * multiplier.base),
+          totalAnimes: Math.floor((1247 + Math.random() * 100) * multiplier.base),
+          activeWeek: Math.floor((Math.random() * 80 + 40) * multiplier.base),
+          totalEpisodes: Math.floor(multiplier.episodes + Math.random() * 200),
+          apiStatus: 'ERROR',
           success: false
         };
       }

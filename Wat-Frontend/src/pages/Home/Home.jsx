@@ -1,5 +1,4 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
-import { FixedSizeGrid, FixedSizeList } from 'react-window';
 import './Home.scss';
 const Header = React.lazy(() => import('../../components/Layout/Header'));
 import { Loading, ErrorMessage, CountrySelector } from '../../components/Common';
@@ -113,38 +112,55 @@ const Home = () => {
     }
 
     if (viewMode === 'list') {
-      const height = Math.min(800, window.innerHeight - 200);
+      // Render a full list so the page height grows naturally
       return (
-        <div ref={containerRef} style={{ width: '100%', height }}>
-          <FixedSizeList
-            height={height}
-            itemCount={animesAujourdhui.length}
-            itemSize={140}
-            width={'100%'}
-            itemData={animesAujourdhui}
-          >
-            {ListRow}
-          </FixedSizeList>
+        <div className="anime-list" ref={containerRef}>
+          {animesAujourdhui.map((anime) => (
+            <div key={anime.mal_id || anime.id || anime.title} style={{ marginBottom: 12 }}>
+              <Suspense fallback={<div style={{width: '100%', height: 120}} />}>
+                <AnimeCard anime={anime} variant={'list'} country={country} />
+              </Suspense>
+            </div>
+          ))}
         </div>
       );
     }
 
-    // Grid virtualization
-    const rowCount = Math.ceil(animesAujourdhui.length / columns);
-    const gridHeight = Math.min(900, window.innerHeight - 200);
+    // Grid rendering: prefer normal grid so the page grows with content
+    // Virtualize only for very large datasets to avoid inner scrollbars
+    const VIRTUALIZE_THRESHOLD = 120;
+    if (animesAujourdhui.length > VIRTUALIZE_THRESHOLD) {
+      const rowCount = Math.ceil(animesAujourdhui.length / columns);
+      const gridHeight = Math.min(900, window.innerHeight - 200);
+      return (
+        <div ref={containerRef} style={{ width: '100%', height: gridHeight }}>
+          <FixedSizeGrid
+            columnCount={columns}
+            columnWidth={CARD_WIDTH + gutter}
+            height={gridHeight}
+            rowCount={rowCount}
+            rowHeight={CARD_HEIGHT + gutter}
+            width={containerWidth || 800}
+            itemData={animesAujourdhui}
+          >
+            {GridCell}
+          </FixedSizeGrid>
+        </div>
+      );
+    }
+
+    // Default: render full grid so the page expands with content
     return (
-      <div ref={containerRef} style={{ width: '100%', height: gridHeight }}>
-        <FixedSizeGrid
-          columnCount={columns}
-          columnWidth={CARD_WIDTH + gutter}
-          height={gridHeight}
-          rowCount={rowCount}
-          rowHeight={CARD_HEIGHT + gutter}
-          width={containerWidth || 800}
-          itemData={animesAujourdhui}
-        >
-          {GridCell}
-        </FixedSizeGrid>
+      <div className={`anime-grid ${viewMode}-view`} ref={containerRef}>
+        {animesAujourdhui.map((anime) => (
+          <Suspense key={anime.mal_id || anime.id || anime.title} fallback={<div style={{width: CARD_WIDTH, height: CARD_HEIGHT}} />}>
+            <AnimeCard 
+              anime={anime} 
+              variant={viewMode === 'list' ? 'list' : 'default'}
+              country={country}
+            />
+          </Suspense>
+        ))}
       </div>
     );
   };

@@ -1,89 +1,126 @@
 import React from 'react';
 import './PlatformLogo.scss';
 
-// Import des SVG depuis les assets
-// Charger dynamiquement tous les assets du dossier `src/assets`
-// Utiliser import.meta.glob avec { eager: true } (compatible avec Vite et certains environnements)
+// Import des SVG depuis les assets (Vite: import.meta.glob)
 const logoModules = import.meta.glob('/src/assets/*.{svg,png,webp}', { eager: true });
 
-// Construire une map simple { 'netflix': '/src/assets/Netflix_2015_N_logo.svg', ... }
+// Construire une map de logos par mot-clé détecté dans le nom de fichier
 const logosMap = {};
 Object.entries(logoModules).forEach(([path, mod]) => {
   const filename = path.split('/').pop();
-  const name = filename.replace(/\.(svg|png|webp)$/i, '').toLowerCase();
   const resolved = mod?.default || mod;
   if (!resolved) return;
-  // minimal normalization: remove extension leftovers and underscores
-  const key = name.replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
-  logosMap[key] = resolved;
-  logosMap[key.replace(/\s+/g, '')] = resolved; // compact key
+  const lname = filename.replace(/\.(svg|png|webp)$/i, '').toLowerCase();
+
+  // Keep a direct key based on filename simplified
+  const fileKey = lname.replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
+  logosMap[fileKey] = resolved;
+
+  // Heuristic keywords -> map them to the resolved asset so frontend can just use backend normalized names
+  if (lname.includes('netflix')) logosMap['netflix'] = resolved;
+  if (lname.includes('crunchy')) logosMap['crunchyroll'] = resolved;
+  if (lname.includes('amazon') || lname.includes('prime')) logosMap['prime video'] = resolved;
+  if (lname.includes('disney')) {
+    logosMap['disney+'] = resolved;
+    logosMap['disney plus'] = resolved;
+  }
+  if (lname.includes('anime') && lname.includes('digital')) logosMap['adn'] = resolved;
+  if (lname.includes('hidive')) logosMap['hidive'] = resolved;
+  if (lname.includes('hbo')) logosMap['hbo max'] = resolved;
+  if (lname.includes('paramount')) logosMap['paramount+'] = resolved;
+  if (lname.includes('apple')) logosMap['apple tv'] = resolved;
+  if (lname.includes('funimation')) logosMap['funimation'] = resolved;
+  if (lname.includes('hulu')) logosMap['hulu'] = resolved;
 });
 
-// Composant pour afficher le logo d'une plateforme de streaming
+// Composant pour afficher le logo d'une plateforme - attend un nom déjà normalisé côté backend
 function PlatformLogo({ platform, size = 'medium' }) {
-  // Normalise le nom de la plateforme en version simple
-  const normalizePlatform = (name = '') => {
-    if (!name) return '';
-    const n = name.toString().trim().toLowerCase();
-    // basic cleanup
-    let compact = n.replace(/[\\/]+/g, ' ').replace(/\s+/g, ' ').replace(/[-_]/g, ' ').trim();
-    compact = compact.replace(/[()]/g, '').trim();
-    // small alias map to cover known backend variants
-    const alias = {
-      'disney+': 'disney plus',
-      'paramount+': 'paramount+',
-      'appletv': 'apple tv',
-      'appletvplus': 'apple tv',
-      'primevideo': 'prime video',
-      'animation digital network': 'adn',
-      'anime digital network': 'adn'
-    };
-    if (alias[compact]) return alias[compact];
-    return compact;
+  const p = (platform || '').toString().trim();
+  const key = p.toLowerCase();
+  // Canonicalize common composite provider names (e.g. "Crunchyroll Amazon Channel")
+  const canonicalKeyFromPlatform = (raw) => {
+    if (!raw) return '';
+    const s = raw.toLowerCase();
+    if (s.includes('crunchy')) return 'crunchyroll';
+    if (s.includes('netflix')) return 'netflix';
+    if (s.includes('prime') || s.includes('amazon')) return 'prime video';
+    if (s.includes('disney')) return 'disney+';
+    if (s.includes('hbo')) return 'hbo max';
+    if (s.includes('paramount')) return 'paramount+';
+    if (s.includes('apple')) return 'apple tv';
+    if (s.includes('funimation')) return 'funimation';
+    if (s.includes('hulu')) return 'hulu';
+    if (s.includes('hidive')) return 'hidive';
+    if (s.includes('anime') && s.includes('digital')) return 'adn';
+    return raw.replace(/[^a-z0-9+ ]/gi, ' ').replace(/\s+/g, ' ').trim();
+  };
+  // small alias table to map common provider name variants to our preferred keys
+  const alias = {
+    'anime digital network': 'adn',
+    'anime-digital-network': 'adn',
+    'animation digital network': 'adn',
+    'adn': 'adn',
+    'disney plus': 'disney+',
+    'disney+': 'disney+',
+    'primevideo': 'prime video',
+    'prime video': 'prime video',
+    'prime': 'prime video',
+    'apple tv': 'apple tv',
+    'appletv': 'apple tv',
   };
 
-  // Map des plateformes vers leurs logos
-  const renderPlatformLogo = (platform) => {
-    const normalizedPlatform = normalizePlatform(platform);
+  // Resolve alias if present
+  const resolvedAliasKey = alias[key] || alias[key.replace(/\s+/g, '')] || null;
+  const canonical = canonicalKeyFromPlatform(key);
+  const lookupKey = resolvedAliasKey || canonical || key;
 
-    // Try a few candidate keys to find a matching SVG in logosMap
-    const candidates = [normalizedPlatform, normalizedPlatform.replace(/\s+/g, ''), normalizedPlatform.replace(/\s+/g, ' ')];
-    for (const key of candidates) {
-      if (key && logosMap[key]) {
-        return <img src={logosMap[key]} alt={platform} className="platform-svg" />;
-      }
-    }
-
-    // Fallbacks lisibles : Apple TV (afficher label clair), Peacock, ou badge court
-    const lower = (platform || '').toString().toLowerCase();
-    if (lower.startsWith('apple tv')) {
-      return (
-        <div className="platform-text apple-logo" style={{ backgroundColor: '#000', color: 'white' }}>
-          {platform}
-        </div>
-      );
-    }
-
-    if (lower.includes('peacock')) {
-      return (
-        <div className="platform-text" style={{ backgroundColor: '#00b4d8', color: 'white' }}>
-          NBC
-        </div>
-      );
-    }
-
-    // Default: deux lettres en fallback
+  // Direct lookup: backend should supply normalized names like 'Netflix', 'Crunchyroll', 'Prime Video', 'Disney+', 'ADN', 'HiDive', 'HBO Max', 'Paramount+', 'Apple TV', 'Funimation', 'Hulu'
+  if (lookupKey && logosMap[lookupKey]) {
     return (
-      <div className="platform-text default-logo" style={{ backgroundColor: '#666', color: 'white' }}>
-        {(platform || '').toString().substring(0, 2).toUpperCase()}
+      <div className={`platform-logo ${size}`} title={platform}>
+        <img src={logosMap[lookupKey]} alt={platform} className="platform-svg" />
       </div>
     );
-  };
+  }
 
-  // Fonction principale qui retourne le JSX complet
+  // Try some fallback variants
+  const compact = key.replace(/\s+/g, ' ').trim();
+  if (logosMap[compact]) {
+    return (
+      <div className={`platform-logo ${size}`} title={platform}>
+        <img src={logosMap[compact]} alt={platform} className="platform-svg" />
+      </div>
+    );
+  }
+
+  const compactNoSpace = compact.replace(/\s+/g, '');
+  if (logosMap[compactNoSpace]) {
+    return (
+      <div className={`platform-logo ${size}`} title={platform}>
+        <img src={logosMap[compactNoSpace]} alt={platform} className="platform-svg" />
+      </div>
+    );
+  }
+
+  // Last resort: try to find an asset whose filename contains a keyword from the platform name
+  for (const k of Object.keys(logosMap)) {
+    if (!k) continue;
+    // prefer exact inclusion of whole keyword
+    if (key.includes(k)) {
+      return (
+        <div className={`platform-logo ${size}`} title={platform}>
+          <img src={logosMap[k]} alt={platform} className="platform-svg" />
+        </div>
+      );
+    }
+  }
+
+  // Default fallback: short badge
   return (
     <div className={`platform-logo ${size}`} title={platform}>
-      {renderPlatformLogo(platform)}
+      <div className="platform-text default-logo" style={{ backgroundColor: '#666', color: 'white' }}>
+        {p.substring(0, 2).toUpperCase()}
+      </div>
     </div>
   );
 }

@@ -23,7 +23,8 @@ const CountrySelector = ({
     { code: 'UK' },
     { code: 'DE' },
     { code: 'ES' },
-    { code: 'IT' }
+    { code: 'IT' },
+    { code: 'WW' } // Worldwide option
   ];
 
   const handleChange = (event) => {
@@ -41,7 +42,7 @@ const CountrySelector = ({
     >
       {supportedCountries.map(country => (
         <option key={country.code} value={country.code}>
-          {t(`countries.${country.code}`)}
+          {t(`countries.${country.code}`, country.code === 'WW' ? 'Worldwide' : undefined)}
         </option>
       ))}
     </select>

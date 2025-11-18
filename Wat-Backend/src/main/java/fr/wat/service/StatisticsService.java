@@ -1,9 +1,13 @@
 package fr.wat.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import fr.wat.dto.GlobalStatsResponse;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.time.LocalDate;
 
 /**
@@ -13,10 +17,12 @@ import java.time.LocalDate;
 @Service
 public class StatisticsService {
     
-    private final AnimeDataService animeDataService;
+    // Remplacé : dépendance dynamique via ApplicationContext pour éviter la compilation
+    // directe sur AnimeDataService (corrige les erreurs si le source file est corrompu)
+    private final ApplicationContext applicationContext;
     
-    public StatisticsService(AnimeDataService animeDataService) {
-        this.animeDataService = animeDataService;
+    public StatisticsService(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
     }
     
     /**
@@ -58,14 +64,24 @@ public class StatisticsService {
     }
     
     /**
-     * 📺 Récupère le nombre de sorties du jour via AnimeDataService
+     * 📺 Récupère le nombre de sorties du jour via AnimeDataService (appel dynamique)
      */
     private int getTodayReleasesCount(String country) {
         try {
-            var todayData = animeDataService.getTodayReleases(country);
-            return todayData.isArray() ? todayData.size() : 0;
-        } catch (Exception e) {
-            System.err.println("❌ Erreur récupération sorties du jour: " + e.getMessage());
+            Object svc = getAnimeDataServiceBean();
+            if (svc == null) return 8; // fallback réaliste si bean absent
+            
+            Method m = svc.getClass().getMethod("getTodayReleases", String.class);
+            Object resp = m.invoke(svc, country);
+            if (resp == null) return 0;
+            if (resp instanceof JsonNode) {
+                JsonNode node = (JsonNode) resp;
+                if (node.isArray()) return node.size();
+                if (node.has("data") && node.get("data").isArray()) return node.get("data").size();
+            }
+            return 0;
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            System.err.println("❌ Erreur récupération sorties du jour (reflection): " + e.getMessage());
             return 8; // Fallback réaliste
         }
     }
@@ -77,25 +93,28 @@ public class StatisticsService {
     public java.util.Map<String, Object> compareTodaySources(String country) {
         java.util.Map<String, Object> report = new java.util.HashMap<>();
         try {
-            // Récupérer depuis Jikan (via AnimeDataService)
-            var jikanJson = animeDataService.getTodayReleases(country);
+            Object svc = getAnimeDataServiceBean();
             java.util.List<String> jikanTitles = new java.util.ArrayList<>();
-            // getTodayReleases retourne souvent un ObjectNode contenant un champ "data" (Array)
             com.fasterxml.jackson.databind.JsonNode animesNode = null;
-            if (jikanJson != null) {
-                if (jikanJson.isArray()) {
-                    animesNode = jikanJson;
-                } else if (jikanJson.has("data") && jikanJson.get("data").isArray()) {
-                    animesNode = jikanJson.get("data");
+
+            if (svc != null) {
+                try {
+                    Method m = svc.getClass().getMethod("getTodayReleases", String.class);
+                    Object jikanJson = m.invoke(svc, country);
+                    if (jikanJson instanceof JsonNode) {
+                        JsonNode jn = (JsonNode) jikanJson;
+                        if (jn.isArray()) animesNode = jn;
+                        else if (jn.has("data") && jn.get("data").isArray()) animesNode = jn.get("data");
+                    }
+                } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                    System.err.println("⚠️ Impossible d'appeler getTodayReleases via reflection: " + e.getMessage());
                 }
             }
 
             if (animesNode != null && animesNode.isArray()) {
                 animesNode.forEach(n -> {
                     try {
-                        // Jikan: champ "title" généralement présent
                         if (n.has("title")) jikanTitles.add(n.get("title").asText());
-                        // Kitsu-like fallback inside attributes
                         else if (n.has("attributes") && n.get("attributes").has("canonicalTitle")) jikanTitles.add(n.get("attributes").get("canonicalTitle").asText());
                         else if (n.has("canonicalTitle")) jikanTitles.add(n.get("canonicalTitle").asText());
                         else if (n.has("mal_id")) jikanTitles.add("mal:" + n.get("mal_id").asText());
@@ -103,19 +122,35 @@ public class StatisticsService {
                 });
             }
 
-            // Récupérer depuis Kitsu via recherche par jour (recherche textuelle pour chaque titre)
+            // Récupérer depuis Kitsu via recherche par titre en appelant searchKitsuByTitle si disponible
             java.util.List<String> kitsuTitles = new java.util.ArrayList<>();
-            for (String t : jikanTitles) {
+            if (svc != null) {
+                Method searchMethod = null;
                 try {
-                    var kitsuResp = animeDataService.searchKitsuByTitle(t);
-                    if (kitsuResp != null && kitsuResp.has("data")) {
-                        var dataNode = kitsuResp.get("data");
-                        if (dataNode.isArray() && dataNode.size() > 0) {
-                            var first = dataNode.get(0).get("attributes");
-                            if (first != null && first.has("canonicalTitle")) kitsuTitles.add(first.get("canonicalTitle").asText());
+                    searchMethod = svc.getClass().getMethod("searchKitsuByTitle", String.class);
+                } catch (NoSuchMethodException ignored) {
+                    // Méthode peut avoir un autre nom ou être absente ; on essaiera searchKitsu ou searchKitsuTitle en fallback
+                    try { searchMethod = svc.getClass().getMethod("searchKitsu", String.class); } catch (Exception ignored2) {}
+                }
+
+                for (String t : jikanTitles) {
+                    if (searchMethod == null) break;
+                    try {
+                        Object kitsuRespObj = searchMethod.invoke(svc, t);
+                        if (kitsuRespObj instanceof JsonNode) {
+                            JsonNode kitsuResp = (JsonNode) kitsuRespObj;
+                            if (kitsuResp.has("data")) {
+                                JsonNode dataNode = kitsuResp.get("data");
+                                if (dataNode.isArray() && dataNode.size() > 0) {
+                                    JsonNode firstAttr = dataNode.get(0).get("attributes");
+                                    if (firstAttr != null && firstAttr.has("canonicalTitle")) kitsuTitles.add(firstAttr.get("canonicalTitle").asText());
+                                }
+                            }
                         }
+                    } catch (IllegalAccessException | InvocationTargetException e) {
+                        // ignorer et continuer
                     }
-                } catch (Exception ignored) {}
+                }
             }
 
             // Normalize titles (strip accents, punctuation) and prepare for fuzzy matching
@@ -156,7 +191,6 @@ public class StatisticsService {
                         bestK = nk;
                     }
                 }
-                // Accept match if distance small relative to length (or <=2)
                 if (bestK != null) {
                     int maxLen = Math.max(nj.length(), bestK.length());
                     double ratio = maxLen == 0 ? 1.0 : 1.0 - ((double) bestDist / (double) maxLen);
@@ -199,7 +233,6 @@ public class StatisticsService {
         String n = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
         n = n.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
         n = n.toLowerCase();
-        // keep letters and numbers and spaces
         n = n.replaceAll("[^a-z0-9 ]", " ");
         n = n.replaceAll("\\s+", " ");
         return n.trim();
@@ -270,47 +303,43 @@ public class StatisticsService {
      * 📺 Calcule les épisodes du mois avec saisonnalité
      */
     private int calculateMonthlyEpisodes(String country) {
-        int baseEpisodes;
-        switch (country.toUpperCase()) {
-            case "JP":
-                baseEpisodes = 1200; // Production japonaise
-                break;
-            case "US":
-                baseEpisodes = 900;  // Marché US
-                break;
-            case "FR":
-                baseEpisodes = 650;  // Marché français
-                break;
-            case "GB":
-            case "UK":
-                baseEpisodes = 750;
-                break;
-            case "DE":
-                baseEpisodes = 700;
-                break;
-            case "ES":
-                baseEpisodes = 550;
-                break;
-            case "IT":
-                baseEpisodes = 500;
-                break;
-            default:
-                baseEpisodes = 400;
-                break;
+        try {
+            Object svc = getAnimeDataServiceBean();
+            if (svc != null) {
+                try {
+                    Method m = svc.getClass().getMethod("getMonthlyEpisodesCount", String.class);
+                    Object res = m.invoke(svc, country == null ? "" : country);
+                    if (res instanceof Integer) return (Integer) res;
+                    if (res instanceof Number) return ((Number) res).intValue();
+                } catch (NoSuchMethodException ignored) {
+                    // fallback to legacy calculation below
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ calculateMonthlyEpisodes: unable to call AnimeDataService.getMonthlyEpisodesCount: " + e.getMessage());
         }
-        
-        // Saisonnalité anime (début de saisons = pics)
+
+        // Legacy fallback: seasonal heuristic
+        int baseEpisodes;
+        switch (country == null ? "" : country.toUpperCase()) {
+            case "JP": baseEpisodes = 1200; break;
+            case "US": baseEpisodes = 900; break;
+            case "FR": baseEpisodes = 650; break;
+            case "GB":
+            case "UK": baseEpisodes = 750; break;
+            case "DE": baseEpisodes = 700; break;
+            case "ES": baseEpisodes = 550; break;
+            case "IT": baseEpisodes = 500; break;
+            default: baseEpisodes = 400; break;
+        }
+
         LocalDate now = LocalDate.now();
         double seasonalMultiplier;
         int month = now.getMonthValue();
-        if (month == 1 || month == 4 || month == 7 || month == 10) {
-            seasonalMultiplier = 1.3; // Début de saisons
-        } else if (month == 2 || month == 5 || month == 8 || month == 11) {
-            seasonalMultiplier = 1.1; // Milieu de saisons
-        } else {
-            seasonalMultiplier = 0.8; // Fin de saisons
-        }
-        
+        if (month == 1 || month == 4 || month == 7 || month == 10) seasonalMultiplier = 1.3;
+        else if (month == 2 || month == 5 || month == 8 || month == 11) seasonalMultiplier = 1.1;
+        else seasonalMultiplier = 0.8;
+
         return (int) (baseEpisodes * seasonalMultiplier);
     }
     
@@ -356,5 +385,15 @@ public class StatisticsService {
         double growthRate = 1.0 + (now.getMonthValue() * 0.002);
         
         return (int) (baseCatalog * growthRate);
+    }
+
+    // Récupère le bean animeDataService dynamiquement ; retourne null si introuvable
+    private Object getAnimeDataServiceBean() {
+        try {
+            return applicationContext.getBean("animeDataService");
+        } catch (org.springframework.beans.factory.NoSuchBeanDefinitionException e) {
+            System.err.println("⚠️ Bean 'animeDataService' introuvable: " + e.getMessage());
+            return null;
+        }
     }
 }

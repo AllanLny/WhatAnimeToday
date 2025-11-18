@@ -326,7 +326,11 @@
     gap: vars.spacing('xl');
     
     &.grid-view {
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      /* Use a smaller min width to fit more cards and match card internals */
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      /* Make each grid row behave consistently so cards in the same row have the same height */
+      grid-auto-rows: 1fr;
+      align-items: start;
       
       @media (max-width: vars.breakpoint('sm')) {
         grid-template-columns: 1fr;
