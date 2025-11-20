@@ -71,9 +71,9 @@ public class AuthController {
         try {
             String expected = session == null ? null : (String) session.getAttribute("oauth_state");
             if (expected == null || state == null || !expected.equals(state) || code == null) {
-                // redirect to login with error
-                String target = (redirectTo != null && !redirectTo.isBlank()) ? redirectTo : "/login";
-                resp.sendRedirect(target + (target.contains("?") ? "&" : "?") + "oauth_error=invalid_state");
+                // redirect to frontend login (avoid server-side /login static lookup)
+                String suffix = "oauth_error=invalid_state";
+                resp.sendRedirect(buildRedirectTarget(redirectTo, suffix));
                 return;
             }
 
@@ -82,8 +82,8 @@ public class AuthController {
             String redirectUri = env.getProperty("discord.redirect.uri", env.getProperty("DISCORD_REDIRECT_URI", "http://localhost:8080/api/auth/discord/callback"));
 
             if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
-                String target = (redirectTo != null && !redirectTo.isBlank()) ? redirectTo : "/login";
-                resp.sendRedirect(target + (target.contains("?") ? "&" : "?") + "oauth_error=config_missing");
+                String suffix = "oauth_error=config_missing";
+                resp.sendRedirect(buildRedirectTarget(redirectTo, suffix));
                 return;
             }
 
@@ -108,8 +108,8 @@ public class AuthController {
             }
 
             if (tokenResp == null || !tokenResp.has("access_token")) {
-                String target = (redirectTo != null && !redirectTo.isBlank()) ? redirectTo : "/login";
-                resp.sendRedirect(target + (target.contains("?") ? "&" : "?") + "oauth_error=token_failed");
+                String suffix = "oauth_error=token_failed";
+                resp.sendRedirect(buildRedirectTarget(redirectTo, suffix));
                 return;
             }
 
@@ -129,8 +129,8 @@ public class AuthController {
             }
 
             if (userResp == null) {
-                String target = (redirectTo != null && !redirectTo.isBlank()) ? redirectTo : "/login";
-                resp.sendRedirect(target + (target.contains("?") ? "&" : "?") + "oauth_error=user_failed");
+                String suffix = "oauth_error=user_failed";
+                resp.sendRedirect(buildRedirectTarget(redirectTo, suffix));
                 return;
             }
 
@@ -152,9 +152,8 @@ public class AuthController {
             resp.addCookie(c);
 
             // Redirect back to frontend (if provided) or to root
-            String suffix = (redirectTo != null && redirectTo.contains("?") ) ? "&justLogged=1" : "?justLogged=1";
-            if (redirectTo != null && !redirectTo.isBlank()) resp.sendRedirect(redirectTo + suffix);
-            else resp.sendRedirect("/" + suffix);
+            String just = "justLogged=1";
+            resp.sendRedirect(buildRedirectTarget(redirectTo, just));
 
         } catch (Exception e) {
             System.err.println("❌ Unhandled OAuth error: " + e.getMessage());
@@ -183,5 +182,39 @@ public class AuthController {
         cookie.setPath("/");
         resp.addCookie(cookie);
         return Map.of("success", true);
+    }
+
+    /**
+     * Build a redirect URL for frontend targets.
+     * If redirectTo is an absolute URL (http/https) we use it.
+     * If redirectTo is a path (starts with '/') and app.frontend.url is configured,
+     * we prefix it with that frontend base. Otherwise we fallback to '/'.
+     * The suffix should be the query (without leading ?), e.g. "oauth_error=..."
+     */
+    private String buildRedirectTarget(String redirectTo, String suffix) {
+        String frontendBase = env.getProperty("app.frontend.url", "").trim();
+        String target = (redirectTo != null && !redirectTo.isBlank()) ? redirectTo : "/login";
+
+        // if absolute URL, just append suffix
+        if (target.startsWith("http://") || target.startsWith("https://")) {
+            return appendSuffix(target, suffix);
+        }
+
+        // if we have a configured frontend base and target is a path, prefix it
+        if (!frontendBase.isBlank()) {
+            String base = frontendBase.replaceAll("/+$", "");
+            String path = target.startsWith("/") ? target : ("/" + target);
+            return appendSuffix(base + path, suffix);
+        }
+
+        // fallback: avoid redirecting to server-side '/login' (can cause "No static resource login.")
+        String fallback = "/";
+        String finalTarget = ("/login".equals(target) || target.isBlank()) ? fallback : target;
+        return appendSuffix(finalTarget, suffix);
+    }
+
+    private String appendSuffix(String url, String suffix) {
+        if (suffix == null || suffix.isBlank()) return url;
+        return url + (url.contains("?") ? "&" : "?") + suffix;
     }
 }

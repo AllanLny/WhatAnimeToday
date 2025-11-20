@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LanguageSelector } from '../Common';
 import { useWATTranslation } from '../../hooks/useWATTranslation';
 import './Header.scss';
@@ -55,6 +55,28 @@ const Header = () => {
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  // Ref for dropdown to handle outside clicks
+  const dropdownRef = useRef(null);
+
+  // Close dropdown on outside click or ESC
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (!dropdownRef.current) return;
+      if (!dropdownRef.current.contains(e.target) && !e.target.closest('.profile-round')) {
+        setProfileOpen(false);
+      }
+    };
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('click', handleOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('click', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [dropdownRef]);
 
   return (
     <header className={`header ${isScrolled ? 'scrolled' : ''}`}>
@@ -114,14 +136,14 @@ const Header = () => {
             </div>
 
             {/* Dropdown under the round avatar */}
-            {profileOpen && (
-              <div className="profile-dropdown">
-                {user ? (
+              <div
+                className={`profile-dropdown ${profileOpen ? 'open' : 'closed'}`}
+                ref={el => (dropdownRef.current = el)}
+                aria-hidden={!profileOpen}
+              >
+                  {user ? (
                   <div className="profile-dropdown-logged">
                     <div className="pd-user">
-                      {user.avatar ? (
-                        <img src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`} alt="avatar" className="pd-avatar" />
-                      ) : null}
                       <div className="pd-meta">
                         <div className="pd-username">{user.username}{user.discriminator ? `#${user.discriminator}` : ''}</div>
                       </div>
@@ -139,12 +161,21 @@ const Header = () => {
                   </div>
                 ) : (
                   <div className="profile-dropdown-guest">
-                      <div className="pd-guest-text">Se connecter pour sauvegarder ta liste et preferences</div>
-                      <a className="btn btn-primary" href="/login">Se connecter avec Discord</a>
-                    </div>
+                    <button
+                      className="btn btn-discord discord-login-btn"
+                      onClick={() => {
+                        // Start OAuth flow on backend which will redirect to Discord
+                        const redirect = window.location.origin + window.location.pathname;
+                        window.location.href = '/api/auth/discord?redirect=' + encodeURIComponent(redirect);
+                      }}
+                      aria-label={t('auth.login_with_discord', { defaultValue: 'Se connecter avec Discord' })}
+                    >
+                      {/* Discord icon + translatable text */}
+                      <span className="discord-text">{t('auth.login_with_discord', { defaultValue: 'Se connecter avec Discord' })}</span>
+                    </button>
+                  </div>
                 )}
-              </div>
-            )}
+            </div>
           </div>
         </nav>
 

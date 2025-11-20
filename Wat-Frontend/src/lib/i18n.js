@@ -175,6 +175,13 @@ const resources = {
         gridView: "Vue grille",
         listView: "Vue liste"
       }
+      ,
+      // 🛂 Auth / OAuth
+      auth: {
+        title: "Se connecter",
+        description: "Connecte-toi avec Discord pour sauvegarder ta watchlist et tes préférences sans créer de compte supplémentaire.",
+        login_with_discord: "Se connecter avec Discord"
+      }
     }
   },
   
@@ -343,6 +350,13 @@ const resources = {
         refresh: "Refresh",
         gridView: "Grid view",
         listView: "List view"
+      }
+      ,
+      // 🛂 Auth / OAuth
+      auth: {
+        title: "Sign in",
+        description: "Sign in with Discord to save your watchlist and preferences without creating an extra account.",
+        login_with_discord: "Sign in with Discord"
       }
     }
   }
