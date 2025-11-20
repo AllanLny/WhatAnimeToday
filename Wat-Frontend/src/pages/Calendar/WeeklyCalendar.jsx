@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { useWATTranslation } from '../../hooks/useWATTranslation';
 import { useUserContext } from '../../context/UserContext';
 import { useWeeklyReleases, useStreamingInfo } from '../../services/api';
-import { PlatformLogo } from '../../components/Common';
+import { PlatformLogo, CountrySelector } from '../../components/Common';
 import './WeeklyCalendar.scss';
-// ...existing imports...
+
 
 // Small helper to render streaming platforms for a given anime using backend data
 const WeeklyStreamingPlatforms = ({ anime }) => {
@@ -24,9 +25,51 @@ const WeeklyStreamingPlatforms = ({ anime }) => {
   );
 };
 
+// List of platforms to show in the filter bar (order matters for UX)
+const CONFIGURED_PLATFORMS = [
+  'all',
+  'netflix',
+  'crunchyroll',
+  'adn',
+  'prime video',
+  'disney+',
+  'hidive',
+  'hbo max',
+  'paramount+',
+  'apple tv',
+  'funimation',
+  'hulu'
+];
+
+// Normalize platform names for comparison (should match PlatformLogo heuristics)
+const normalizePlatform = (raw) => {
+  if (!raw) return '';
+  const s = raw.toString().toLowerCase();
+  if (s.includes('crunchy')) return 'crunchyroll';
+  if (s.includes('netflix')) return 'netflix';
+  if (s.includes('prime') || s.includes('amazon')) return 'prime video';
+  if (s.includes('disney')) return 'disney+';
+  if (s.includes('hidive')) return 'hidive';
+  if (s.includes('hbo')) return 'hbo max';
+  if (s.includes('paramount')) return 'paramount+';
+  if (s.includes('apple')) return 'apple tv';
+  if (s.includes('funimation')) return 'funimation';
+  if (s.includes('hulu')) return 'hulu';
+  if (s.includes('anime') && s.includes('digital')) return 'adn';
+  // fallback: remove punctuation and collapse spaces
+  return s.replace(/[^a-z0-9+ ]/gi, ' ').replace(/\s+/g, ' ').trim();
+};
+
 function WeeklyCalendar() {
   const [selectedPlatform, setSelectedPlatform] = useState('all');
-  const { country } = useUserContext();
+  const { country, setCountry } = useUserContext();
+  const { t } = useWATTranslation();
+
+  const handleCountryChange = (newCountry) => {
+    // update context country and reset platform filter
+    setSelectedPlatform('all');
+    if (setCountry) setCountry(newCountry);
+  };
   
   // Utilisation du hook TanStack Query pour récupérer le calendrier hebdomadaire
   const { 
@@ -51,6 +94,57 @@ function WeeklyCalendar() {
     friday: [],
     saturday: []
   };
+
+  // Compute platform availability counts across the week (used for badges)
+  const platformCounts = CONFIGURED_PLATFORMS.reduce((acc, p) => { acc[p] = 0; return acc; }, {});
+  const allAnimes = Object.values(weeklySchedule).flat();
+
+  const extractProviderName = (p) => {
+    if (!p) return '';
+    if (typeof p === 'string') return p;
+    return (p.normalized_name || p.provider_name || p.provider || p.name || '').toString();
+  };
+
+  const getAvailablePlatformsForAnime = (anime) => {
+    const available = new Set();
+    if (!anime) return available;
+
+    // streamingInfo can be an object with keys for providers or TMDB-like objects
+    if (anime.streamingInfo && typeof anime.streamingInfo === 'object') {
+      Object.entries(anime.streamingInfo).forEach(([k, v]) => {
+        if (!k) return;
+        // If value is an array with items, consider provider available
+        if (Array.isArray(v) && v.length > 0) {
+          available.add(normalizePlatform(k));
+          return;
+        }
+        // If value has an 'available' flag or contains links/offers, consider available
+        if (v && (v.available === true || v.available === 'true' || v.available === 1 || v.url || v.link || v.offers || v.flatrate || v.buy)) {
+          available.add(normalizePlatform(k));
+          return;
+        }
+      });
+    }
+
+    // streaming and platforms are often arrays of provider objects
+    const arrays = [];
+    if (Array.isArray(anime.streaming)) arrays.push(...anime.streaming);
+    if (Array.isArray(anime.platforms)) arrays.push(...anime.platforms);
+    arrays.forEach(p => {
+      const name = extractProviderName(p);
+      if (name) available.add(normalizePlatform(name));
+    });
+
+    return available;
+  };
+
+  allAnimes.forEach(anime => {
+    const available = getAvailablePlatformsForAnime(anime);
+    CONFIGURED_PLATFORMS.forEach(p => {
+      if (p === 'all') return;
+      if (available.has(p)) platformCounts[p] = (platformCounts[p] || 0) + 1;
+    });
+  });
 
   // Jours de la semaine en français
   const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -116,59 +210,47 @@ function WeeklyCalendar() {
   const getFilteredAnimes = (animes) => {
     if (!animes) return [];
     if (selectedPlatform === 'all') return animes;
-    
-    return animes.filter(anime => anime.streamingInfo && anime.streamingInfo[selectedPlatform]?.available);
+    const wanted = normalizePlatform(selectedPlatform);
+    return animes.filter(anime => {
+      const available = getAvailablePlatformsForAnime(anime);
+      return available.has(wanted);
+    });
   };
 
   return (
     <div className="weekly-calendar">
-      <h1>Calendrier des sorties de la semaine</h1>
-      <p className="country-indicator">Pays sélectionné: <span>{country}</span></p>
-      
+      <div className="calendar-header">
+        <h2 className="section-title">{t('calendar.title', { defaultValue: 'Calendrier des sorties' })}</h2>
+        <div className="section-controls">
+          <CountrySelector
+            value={country}
+            onChange={handleCountryChange}
+            showLabel={false}
+            compact={true}
+          />
+        </div>
+      </div>
+
       <div className="platform-filter">
-        <span>Filtrer par plateforme:</span>
+        <span>{t('calendar.filter_by_platform', { defaultValue: 'Filtrer par plateforme:' })}</span>
         <div className="filter-buttons">
-          <button 
-            className={selectedPlatform === 'all' ? 'active' : ''} 
-            onClick={() => setSelectedPlatform('all')}
-          >
-            Toutes
-          </button>
-          
-          <button 
-            className={selectedPlatform === 'netflix' ? 'active' : ''} 
-            onClick={() => setSelectedPlatform('netflix')}
-          >
-            <PlatformLogo platform="netflix" size="small" /> Netflix
-          </button>
-          
-          <button 
-            className={selectedPlatform === 'crunchyroll' ? 'active' : ''} 
-            onClick={() => setSelectedPlatform('crunchyroll')}
-          >
-            <PlatformLogo platform="crunchyroll" size="small" /> Crunchyroll
-          </button>
-          
-          <button 
-            className={selectedPlatform === 'adn' ? 'active' : ''} 
-            onClick={() => setSelectedPlatform('adn')}
-          >
-            <PlatformLogo platform="adn" size="small" /> ADN
-          </button>
-          
-          <button 
-            className={selectedPlatform === 'prime video' ? 'active' : ''} 
-            onClick={() => setSelectedPlatform('prime video')}
-          >
-            <PlatformLogo platform="prime video" size="small" /> Prime Video
-          </button>
-          
-          <button 
-            className={selectedPlatform === 'disney plus' ? 'active' : ''} 
-            onClick={() => setSelectedPlatform('disney plus')}
-          >
-            <PlatformLogo platform="disney plus" size="small" /> Disney+
-          </button>
+          {CONFIGURED_PLATFORMS.map((p) => {
+            const isAll = p === 'all';
+            const count = isAll ? allAnimes.length : (platformCounts[p] || 0);
+            const label = isAll ? t('calendar.all', { defaultValue: 'Toutes' }) : p[0].toUpperCase() + p.slice(1);
+            return (
+              <button
+                key={p}
+                className={selectedPlatform === p ? 'active' : ''}
+                onClick={() => setSelectedPlatform(p)}
+                title={isAll ? label : `${label} — ${count}`}
+              >
+                {!isAll ? <PlatformLogo platform={p} size="small" /> : null}
+                <span className="filter-label">{label}</span>
+                <span className="filter-count">{count > 0 ? ` ${count}` : ''}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
       

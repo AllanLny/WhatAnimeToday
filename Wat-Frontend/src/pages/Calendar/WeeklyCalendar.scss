@@ -2,6 +2,13 @@
 @use '../../variables' as vars;
 
 .weekly-calendar {
+  // Contrainte de largeur pour laisser respirer les côtés et s'aligner
+  // visuellement avec les autres pages (hero, sections principales)
+  max-width: 1200px;
+  margin: 0 auto;
+
+  padding: 0 vars.$spacing-lg;
+
   h1 {
     background: linear-gradient(to right, vars.$color-secondary, vars.$color-accent);
     -webkit-background-clip: text;
@@ -65,10 +72,17 @@
 }
 
 .calendar-grid {
+  margin-top: vars.$spacing-lg;
   display: grid;
+  /* Keep 7 columns but allow the grid to breathe by limiting the global width above */
   grid-template-columns: repeat(7, 1fr);
-  gap: vars.$spacing-sm;
+  gap: vars.$spacing-md; /* slightly larger gap for better separation */
   margin-bottom: vars.$spacing-lg;
+  /* Allow horizontal scrolling when there are many columns or when columns have a min-width */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* show a subtle fade on the right to hint scrollability */
+  position: relative;
   
   @media (max-width: vars.$breakpoint-lg) {
     grid-template-columns: repeat(3, 1fr);
@@ -83,122 +97,120 @@
   }
 }
 
-.day-card {
-  background-color: vars.$color-bg-card;
+.day-column {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.03);
+  backdrop-filter: blur(8px);
   border-radius: vars.$border-radius-lg;
-  padding: vars.$spacing-md;
-  min-height: 300px;
-  transition: transform vars.$transition-speed vars.$transition-timing,
-              box-shadow vars.$transition-speed vars.$transition-timing;
-  
+  /* Slightly tighter padding to reduce visual bulk */
+  padding: vars.$spacing-sm;
+  /* Reduce min height to make columns less tall and leave more horizontal breathing room */
+  min-height: 260px;
+  /* Ensure each column keeps a readable width; if the container is too small this forces horizontal scroll */
+  min-width: 260px;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: vars.$box-shadow;
+    transform: translateY(-4px);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.6);
   }
-  
-  &.today {
-    background: linear-gradient(135deg, vars.$color-primary, vars.$color-secondary);
-    color: white;
-    
-    .day-header {
-      color: white;
-    }
-    
-    .anime-count {
-      background-color: rgba(255, 255, 255, 0.2);
-      color: white;
-    }
+
+  &.current-day {
+    border-color: vars.$color-primary;
+    box-shadow: 0 8px 28px rgba(88,101,242,0.08);
   }
-  
-  .day-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: vars.$spacing-md;
-    padding-bottom: vars.$spacing-sm;
-    border-bottom: 1px solid vars.$color-bg-hover;
-    
-    .day-name {
-      font-weight: 600;
-      color: vars.$color-text-primary;
-      font-size: 1.1rem;
-    }
-    
-    .day-date {
-      font-size: 0.9rem;
-      color: vars.$color-text-secondary;
-    }
+
+  h2 {
+    margin: 0 0 vars.$spacing-sm 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: vars.$color-text-primary;
   }
-  
-  .anime-count {
-    display: inline-block;
-    background-color: vars.$color-primary;
-    color: white;
-    padding: vars.$spacing-xs vars.$spacing-sm;
-    border-radius: vars.$border-radius-sm;
-    font-size: 0.8rem;
-    font-weight: 500;
-    margin-bottom: vars.$spacing-sm;
-  }
-  
+
   .anime-list {
-    .anime-item {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-sm;
+
+    .calendar-anime-card {
       display: flex;
-      align-items: center;
+      gap: vars.$spacing-sm;
+      align-items: flex-start;
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.03);
       padding: vars.$spacing-sm;
-      margin-bottom: vars.$spacing-xs;
-      background-color: vars.$color-bg-hover;
       border-radius: vars.$border-radius-md;
-      transition: background-color vars.$transition-speed vars.$transition-timing;
-      
+      cursor: pointer;
+      transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+
       &:hover {
-        background-color: color.adjust(vars.$color-bg-hover, $lightness: 10%);
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.03));
       }
-      
-      .anime-poster {
-        width: 40px;
-        height: 60px;
+
+      .calendar-anime-image {
+        /* Slightly smaller posters to fit more items horizontally */
+        width: 56px;
+        height: 82px;
         object-fit: cover;
-        border-radius: vars.$border-radius-sm;
-        margin-right: vars.$spacing-sm;
-        background-color: vars.$color-bg-dark;
+        border-radius: 8px;
+        flex: 0 0 64px;
       }
-      
-      .anime-details {
-        flex: 1;
+
+      .calendar-anime-info {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
         min-width: 0;
-        
-        .anime-title {
-          font-weight: 500;
+
+        h3 {
+          margin: 0;
+          font-size: 1rem;
+          font-weight: 700;
           color: vars.$color-text-primary;
-          font-size: 0.9rem;
-          margin-bottom: vars.$spacing-xs;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        
-        .anime-time {
+
+        p {
+          margin: 0;
+          font-size: 0.85rem;
           color: vars.$color-text-secondary;
-          font-size: 0.8rem;
         }
-        
-        .anime-episode {
-          color: vars.$color-accent;
-          font-size: 0.8rem;
-          font-weight: 500;
+
+        .available-platforms {
+          margin-top: 6px;
+          display: flex;
+          gap: 8px;
+          align-items: center;
         }
       }
     }
-  }
-  
-  .no-releases {
-    text-align: center;
-    color: vars.$color-text-muted;
-    font-style: italic;
-    padding: vars.$spacing-lg 0;
+
+    .no-anime-message {
+      color: vars.$color-text-muted;
+      font-style: italic;
+      padding: vars.$spacing-sm 0;
+    }
   }
 }
+
+/* Scroll hint gradient on the right edge of the calendar-grid */
+.calendar-grid::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 48px;
+  background: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.4));
+  transition: opacity 200ms ease;
+}
+
+/* The gradient hint is intentionally left always available; JS can toggle visibility later if needed */
 
 .view-toggles {
   display: flex;
@@ -231,30 +243,50 @@
 .loading-calendar {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: vars.$spacing-sm;
+  gap: vars.$spacing-md;
   
   .loading-day {
     background-color: vars.$color-bg-card;
     border-radius: vars.$border-radius-lg;
-    padding: vars.$spacing-md;
-    height: 300px;
+    padding: vars.$spacing-sm;
+      height: 260px;
     
     .skeleton {
-      background: linear-gradient(90deg, vars.$color-bg-hover 25%, vars.$color-bg-card 50%, vars.$color-bg-hover 75%);
-      background-size: 200% 100%;
-      animation: loading 1.5s infinite;
-      border-radius: vars.$border-radius-sm;
+        background: linear-gradient(90deg, vars.$color-bg-hover 25%, vars.$color-bg-card 50%, vars.$color-bg-hover 75%);
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+        border-radius: vars.$border-radius-sm;
+        display: flex;
+        gap: vars.$spacing-sm;
+        align-items: center;
     }
     
     .skeleton-header {
-      height: 20px;
-      margin-bottom: vars.$spacing-sm;
+        height: 20px;
+        margin-bottom: vars.$spacing-sm;
     }
     
-    .skeleton-item {
-      height: 60px;
-      margin-bottom: vars.$spacing-xs;
-    }
+      .skeleton-item {
+        height: 102px; // match new poster height
+        margin-bottom: vars.$spacing-xs;
+        width: 72px;
+        border-radius: 8px;
+        flex: 0 0 72px;
+      }
+
+      .skeleton-lines {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: vars.$spacing-xs;
+      }
+
+      .skeleton-line {
+        height: 12px;
+        width: 80%;
+        border-radius: 6px;
+        background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.06));
+      }
   }
 }
 
@@ -278,7 +310,7 @@
     text-align: center;
   }
   
-  .day-card {
-    min-height: 250px;
+  .day-column {
+    min-height: 220px;
   }
 }

@@ -37,6 +37,7 @@ function normalizeCountryParam(country) {
 
 // Fonction pour organiser les animes par jour de la semaine (Jikan API via backend)
 function organizaByWeekDay(animes) {
+  if (!animes || !Array.isArray(animes)) animes = [];
   const weekDays = {
     'monday': [],
     'tuesday': [],
@@ -219,14 +220,36 @@ export const useWeeklyReleases = (options = {}) => {
         }
         
         const data = await response.json();
-        
+
         if (!data.success) {
           throw new Error(data.error || 'Erreur lors de la récupération du calendrier');
         }
-        
-        // Pour le calendrier, on organise les données Jikan par jour de la semaine
-        const weeklyData = organizaByWeekDay(data.data.data || [], country);
-        
+
+        // Backend may return multiple shapes. Normalise robustly:
+        // - data.data can be an ARRAY of anime objects (legacy)
+        // - or data.data can be an OBJECT { country?: 'FR', data: { sunday: [...], ... } }
+        // - or data.data can already be the mapping { sunday: [...], ... }
+        const payload = data.data || data || {};
+
+        // Helper to detect a week mapping object
+        const looksLikeWeekObject = (obj) => obj && typeof obj === 'object' && !Array.isArray(obj)
+          && (obj.sunday || obj.monday || obj.tuesday || obj.wednesday || obj.thursday || obj.friday || obj.saturday);
+
+        // If payload wraps the actual mapping in a 'data' field, unwrap it
+        let weekCandidate = payload;
+        if (!looksLikeWeekObject(weekCandidate) && weekCandidate.data && looksLikeWeekObject(weekCandidate.data)) {
+          weekCandidate = weekCandidate.data;
+        }
+
+        if (looksLikeWeekObject(weekCandidate)) {
+          // Already organised server-side
+          return weekCandidate;
+        }
+
+        // Otherwise, try to obtain an array of anime objects to organise client-side
+        const sourceArray = Array.isArray(payload) ? payload : (Array.isArray(payload.data) ? payload.data : []);
+        const weeklyData = organizaByWeekDay(sourceArray || [], country);
+
         return weeklyData;
         
       } catch (error) {

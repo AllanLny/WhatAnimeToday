@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { LanguageSelector } from '../Common';
 import { useWATTranslation } from '../../hooks/useWATTranslation';
 import './Header.scss';
@@ -10,6 +11,10 @@ const Header = () => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [user, setUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const location = useLocation();
+  // Determine the top-level page name from the path: '/' -> 'home', '/calendar' -> 'calendar', etc.
+  const pathSegment = location.pathname.split('/').filter(Boolean)[0] || 'home';
+  const page = pathSegment;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -79,7 +84,7 @@ const Header = () => {
   }, [dropdownRef]);
 
   return (
-    <header className={`header ${isScrolled ? 'scrolled' : ''}`}>
+    <header className={`header ${isScrolled ? 'scrolled' : ''} header--${page}`}>
       <div className="container">
         {/* Logo */}
         <a href="/" className="logo">
@@ -90,27 +95,31 @@ const Header = () => {
         <nav className="nav">
           <ul className="nav-links">
             <li className="nav-link">
-              <a href="/" className="active">{t('nav.home')}</a>
+              <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''}>{t('nav.home')}</NavLink>
             </li>
             <li className="nav-link">
-              <a href="/calendar">{t('nav.calendar')}</a>
+              <NavLink to="/calendar" className={({ isActive }) => isActive ? 'active' : ''}>{t('nav.calendar')}</NavLink>
             </li>
             <li className="nav-link">
-              <a href="/watchlist">Ma Liste</a>
+              <NavLink to="/watchlist" className={({ isActive }) => isActive ? 'active' : ''}>{t('nav.watchlist', 'Ma Liste')}</NavLink>
             </li>
             <li className="nav-link">
-              <a href="/trending">Tendances</a>
+              <NavLink to="/trending" className={({ isActive }) => isActive ? 'active' : ''}>{t('nav.trending', 'Tendances')}</NavLink>
             </li>
           </ul>
 
           {/* Search Bar */}
-          <div className="search-bar">
-            <input 
-              type="text" 
-              className="search-input" 
-              placeholder={t('search.placeholder', 'Rechercher un anime...')}
-            />
-          </div>
+          {/* Hide search on certain pages (calendar, login) to reduce clutter
+          {page !== 'calendar' && page !== 'login' && (
+            <div className="search-bar">
+              <input 
+                type="text" 
+                className="search-input" 
+                placeholder={t('search.placeholder', 'Rechercher un anime...')}
+                aria-label={t('search.placeholder', 'Rechercher un anime...')}
+              />
+            </div>
+          )} */}
 
           {/* Language Selector */}
           <LanguageSelector showText={false} className="header-language" />
@@ -118,7 +127,7 @@ const Header = () => {
           {/* User Profile */}
           <div className="user-profile">
             {/* Round avatar / guest or logged */}
-            <div className={`profile-round ${profileOpen ? 'open' : ''}`} onClick={() => setProfileOpen(p => !p)} role="button" tabIndex={0}>
+            <div className={`profile-round ${profileOpen ? 'open' : ''} ${page === 'calendar' ? 'compact' : ''}`} onClick={() => setProfileOpen(p => !p)} role="button" tabIndex={0}>
               {user ? (
                 user.avatar ? (
                   <img
@@ -190,19 +199,19 @@ const Header = () => {
       </div>
 
       {/* Mobile Navigation */}
-      <nav className={`mobile-nav ${isMobileMenuOpen ? 'open' : ''}`}>
+          <nav className={`mobile-nav ${isMobileMenuOpen ? 'open' : ''}`}>
         <ul className="mobile-nav-links">
           <li className="nav-link">
-            <a href="/" className="active">{t('nav.home')}</a>
+            <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''}>{t('nav.home')}</NavLink>
           </li>
           <li className="nav-link">
-            <a href="/calendar">{t('nav.calendar')}</a>
+            <NavLink to="/calendar" className={({ isActive }) => isActive ? 'active' : ''}>{t('nav.calendar')}</NavLink>
           </li>
           <li className="nav-link">
-            <a href="/watchlist">{t('nav.watchlist', 'Ma Liste')}</a>
+            <NavLink to="/watchlist" className={({ isActive }) => isActive ? 'active' : ''}>{t('nav.watchlist', 'Ma Liste')}</NavLink>
           </li>
           <li className="nav-link">
-            <a href="/trending">{t('nav.trending', 'Tendances')}</a>
+            <NavLink to="/trending" className={({ isActive }) => isActive ? 'active' : ''}>{t('nav.trending', 'Tendances')}</NavLink>
           </li>
         </ul>
         

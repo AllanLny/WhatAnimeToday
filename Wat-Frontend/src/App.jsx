@@ -9,6 +9,8 @@ const Home = React.lazy(() => import('./pages/Home/Home'));
 const WeeklyCalendar = React.lazy(() => import('./pages/Calendar/WeeklyCalendar'));
 const Settings = React.lazy(() => import('./pages/Settings/Settings'));
 const Login = React.lazy(() => import('./pages/Login/Login'));
+// Render Header globally so it's present on all routes (e.g. /calendar)
+const Header = React.lazy(() => import('./components/Layout/Header'));
 
 // Configuration React Query optimisée
 const queryClient = new QueryClient({
@@ -37,6 +39,10 @@ function App() {
       <UserProvider>
         <Router>
           <div className="app">
+            <Suspense fallback={<div style={{height: 64}} />}>
+              <Header />
+            </Suspense>
+
             <Suspense fallback={<div />}>
               <Routes>
                 <Route path="/" element={<Home />} />

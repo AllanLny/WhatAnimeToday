@@ -38,8 +38,11 @@ public class AnimeDataService {
     private final java.util.concurrent.ConcurrentHashMap<String, JsonNode> scheduleCache = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ConcurrentHashMap<String, Long> scheduleCacheTimestamps = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ConcurrentHashMap<String, Long> scheduleFailureTimestamps = new java.util.concurrent.ConcurrentHashMap<>();
+    // Per-anime failure timestamps to avoid hammering Jikan/TMDB for items that recently failed
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> detailFailureTimestamps = new java.util.concurrent.ConcurrentHashMap<>();
     private final long SCHEDULE_CACHE_TTL_MS = 5 * 60 * 1000L; // 5 minutes
     private final long SCHEDULE_FAILURE_COOLDOWN_MS = 60 * 1000L; // 1 minute cooldown after failure
+    private final long DETAIL_FAILURE_COOLDOWN_MS = 5 * 60 * 1000L; // 5 minutes cooldown for per-anime failures
     // Delay between country requests when aggregating worldwide to avoid saturating external APIs
     private final long WORLDWIDE_REQUEST_DELAY_MS = 800L; // 800ms between requests
 
@@ -230,7 +233,93 @@ public class AnimeDataService {
         System.out.println("📅 getWeeklyCalendar pour: " + (country == null ? "null" : country));
         ObjectNode out = objectMapper.createObjectNode();
         out.put("country", country == null ? "" : country.toUpperCase());
-        out.set("data", objectMapper.createArrayNode());
+
+        List<String> days = Arrays.asList("sunday","monday","tuesday","wednesday","thursday","friday","saturday");
+        ObjectNode week = objectMapper.createObjectNode();
+
+        // If dev sample mode, populate with simple mock entries for each day
+        if (this.enableDevSample) {
+            for (String d : days) {
+                ArrayNode arr = objectMapper.createArrayNode();
+                ObjectNode a1 = objectMapper.createObjectNode();
+                a1.put("title", "One Piece - " + d);
+                a1.put("mal_id", 21);
+                a1.put("episode", 1054);
+                a1.put("air_time", "22:00");
+                a1.put("broadcast_day", d);
+                arr.add(a1);
+
+                ObjectNode a2 = objectMapper.createObjectNode();
+                a2.put("title", "Spy x Family - " + d);
+                a2.put("mal_id", 50265);
+                a2.put("episode", 12);
+                a2.put("air_time", "20:30");
+                a2.put("broadcast_day", d);
+                arr.add(a2);
+
+                week.set(d, arr);
+            }
+            out.set("data", week);
+            return out;
+        }
+
+        // Production path: fetch schedule per weekday from Jikan with caching & retry
+        for (String d : days) {
+            String jikanPath = "/schedules/" + d;
+            ArrayNode arr = objectMapper.createArrayNode();
+
+            try {
+                Long lastTs = scheduleCacheTimestamps.get(jikanPath);
+                JsonNode cached = scheduleCache.get(jikanPath);
+                long now = System.currentTimeMillis();
+                if (cached != null && lastTs != null && (now - lastTs) < SCHEDULE_CACHE_TTL_MS) {
+                    if (cached.isArray()) arr = (ArrayNode) cached;
+                    else if (cached.has("data") && cached.get("data").isArray()) arr = (ArrayNode) cached.get("data");
+                } else {
+                    Long lastFail = scheduleFailureTimestamps.getOrDefault(jikanPath, 0L);
+                    if ((now - lastFail) < SCHEDULE_FAILURE_COOLDOWN_MS) {
+                        System.err.println("⚠️ Recent Jikan failure for " + jikanPath + ", skipping fetch until cooldown expires.");
+                    } else {
+                        JsonNode resp = null;
+                        for (int attempt = 1; attempt <= 4; attempt++) {
+                            try {
+                                resp = jikanClient.get()
+                                        .uri(jikanPath)
+                                        .retrieve()
+                                        .bodyToMono(JsonNode.class)
+                                        .block();
+                                if (resp != null) break;
+                            } catch (Exception e) {
+                                System.err.println("⚠️ Jikan attempt " + attempt + " for " + jikanPath + " failed: " + e.getMessage());
+                                if (e.getMessage() != null && e.getMessage().contains("429")) {
+                                    scheduleFailureTimestamps.put(jikanPath, System.currentTimeMillis());
+                                }
+                                try { TimeUnit.MILLISECONDS.sleep(500L * attempt); } catch (InterruptedException ignored) {}
+                            }
+                        }
+
+                        if (resp != null) {
+                            scheduleCache.put(jikanPath, resp);
+                            scheduleCacheTimestamps.put(jikanPath, System.currentTimeMillis());
+                            if (resp.isArray()) arr = (ArrayNode) resp;
+                            else if (resp.has("data") && resp.get("data").isArray()) arr = (ArrayNode) resp.get("data");
+                        } else {
+                            System.err.println("❌ Jikan did not return data for path " + jikanPath + " — leaving day empty.");
+                            scheduleFailureTimestamps.put(jikanPath, System.currentTimeMillis());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Error while fetching schedule for " + jikanPath + ": " + e.getMessage());
+            }
+
+            week.set(d, arr);
+
+            // small delay between day requests to be gentle with external APIs
+            try { TimeUnit.MILLISECONDS.sleep(WORLDWIDE_REQUEST_DELAY_MS); } catch (InterruptedException ignored) {}
+        }
+
+        out.set("data", week);
         return out;
     }
 
@@ -292,28 +381,50 @@ public class AnimeDataService {
                         }
                     }
 
-                    // If not found in today's cached data, fallback to single Jikan request (with limited retries)
+                    // If not found in today's cached data, decide next step:
+                    // - If animeId looks like a numeric MAL id, fetch /anime/{id}
+                    // - If animeId looks like a title (non-numeric), treat it as titleToSearch and avoid calling Jikan by id (which returns 404)
                     if (titleToSearch == null) {
-                        for (int attempt = 1; attempt <= 2; attempt++) {
-                            try {
-                                JsonNode jikanResp = jikanClient.get()
-                                        .uri(uriBuilder -> uriBuilder.path("/anime/{id}").build(animeId))
-                                        .retrieve()
-                                        .bodyToMono(JsonNode.class)
-                                        .block();
-                                if (jikanResp != null) {
-                                    if (jikanResp.has("data")) {
-                                        JsonNode attrs = jikanResp.get("data");
-                                        if (attrs.has("title_english") && !attrs.get("title_english").isNull()) titleToSearch = attrs.get("title_english").asText();
-                                        if ((titleToSearch == null || titleToSearch.isBlank()) && attrs.has("title")) titleToSearch = attrs.get("title").asText();
-                                    } else if (jikanResp.has("title")) {
-                                        titleToSearch = jikanResp.get("title").asText();
+                        boolean isNumericId = animeId != null && animeId.matches("^\\d+$");
+                        if (!isNumericId) {
+                            // animeId seems to be a title string — use it directly as search term
+                            titleToSearch = animeId;
+                        } else {
+                            // If we recently failed resolving this anime, skip extra attempts to avoid hammering Jikan
+                            long now = System.currentTimeMillis();
+                            Long lastFail = detailFailureTimestamps.getOrDefault(animeId, 0L);
+                            if ((now - lastFail) < DETAIL_FAILURE_COOLDOWN_MS) {
+                                System.err.println("⚠️ Recent failure resolving animeId=" + animeId + ", skipping Jikan lookup until cooldown expires.");
+                            } else {
+                                for (int attempt = 1; attempt <= 2; attempt++) {
+                                    try {
+                                        JsonNode jikanResp = jikanClient.get()
+                                                .uri(uriBuilder -> uriBuilder.path("/anime/{id}").build(animeId))
+                                                .retrieve()
+                                                .bodyToMono(JsonNode.class)
+                                                .block();
+                                        if (jikanResp != null) {
+                                            if (jikanResp.has("data")) {
+                                                JsonNode attrs = jikanResp.get("data");
+                                                if (attrs.has("title_english") && !attrs.get("title_english").isNull()) titleToSearch = attrs.get("title_english").asText();
+                                                if ((titleToSearch == null || titleToSearch.isBlank()) && attrs.has("title")) titleToSearch = attrs.get("title").asText();
+                                            } else if (jikanResp.has("title")) {
+                                                titleToSearch = jikanResp.get("title").asText();
+                                            }
+                                        }
+                                        if (titleToSearch != null && !titleToSearch.isBlank()) break;
+                                    } catch (Exception e) {
+                                        System.err.println("⚠️ Jikan fetch for animeId=" + animeId + " failed: " + e.getMessage());
+                                        if (e.getMessage() != null && e.getMessage().contains("429")) {
+                                            detailFailureTimestamps.put(animeId, System.currentTimeMillis());
+                                        }
+                                        try { TimeUnit.MILLISECONDS.sleep(400L * attempt); } catch (InterruptedException ignored) {}
                                     }
                                 }
-                                if (titleToSearch != null && !titleToSearch.isBlank()) break;
-                            } catch (Exception e) {
-                                System.err.println("⚠️ Jikan fetch for animeId=" + animeId + " failed: " + e.getMessage());
-                                try { TimeUnit.MILLISECONDS.sleep(400L * attempt); } catch (InterruptedException ignored) {}
+                                if (titleToSearch == null) {
+                                    // mark failure to avoid repeated attempts in short time
+                                    detailFailureTimestamps.put(animeId, System.currentTimeMillis());
+                                }
                             }
                         }
                     }

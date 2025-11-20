@@ -50,6 +50,9 @@ const resources = {
       // 📅 Calendrier
       calendar: {
         title: "Calendrier des sorties",
+        current_region: "Pays sélectionné:",
+        filter_by_platform: "Filtrer par plateforme:",
+        all: "Toutes",
         week: "Semaine",
         today: "Aujourd'hui",
         tomorrow: "Demain",
@@ -226,6 +229,9 @@ const resources = {
       // 📅 Calendar
       calendar: {
         title: "Release Calendar",
+        current_region: "Selected country:",
+        filter_by_platform: "Filter by platform:",
+        all: "All",
         week: "Week",
         today: "Today",
         tomorrow: "Tomorrow", 

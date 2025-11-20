@@ -1,6 +1,5 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
 import './Home.scss';
-const Header = React.lazy(() => import('../../components/Layout/Header'));
 import { Loading, ErrorMessage, CountrySelector } from '../../components/Common';
 const AnimeCard = React.lazy(() => import('../../components/Common/Cards/AnimeCard/AnimeCard'));
 import { useTodayReleases, useGlobalStats } from '../../services/api';
@@ -261,9 +260,6 @@ const Home = () => {
 
   return (
     <>
-      <Suspense fallback={<div style={{height: 64}} />}>
-        <Header />
-      </Suspense>
       <main className="home">
         {/* Hero Section */}
         <section className="hero-section">
