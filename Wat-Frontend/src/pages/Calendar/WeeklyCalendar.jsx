@@ -37,6 +37,21 @@ function WeeklyCalendar() {
   const { country, setCountry } = useUserContext();
   const { t } = useWATTranslation();
 
+  // Jours de la semaine en français (déclarés en haut pour être disponibles pendant le skeleton load)
+  // Utiliser i18n pour traduire les jours (fallback géré par i18n.js)
+  const days = [
+    t('calendar.days.sunday'),
+    t('calendar.days.monday'),
+    t('calendar.days.tuesday'),
+    t('calendar.days.wednesday'),
+    t('calendar.days.thursday'),
+    t('calendar.days.friday'),
+    t('calendar.days.saturday')
+  ];
+  const daysLower = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  // Jour actuel pour le mettre en évidence
+  const currentDay = new Date().getDay();
+
   const handleCountryChange = (newCountry) => {
     // update context country and reset platform filter
     // no platform filter state
@@ -80,7 +95,42 @@ function WeeklyCalendar() {
 
   // Construction du calendrier avec les informations de streaming
   // Avec TanStack Query, les données de streaming sont déjà incluses
-  if (isLoading) return <div className="loading-spinner">Chargement du calendrier...</div>;
+  // Pendant le chargement, afficher la grille du calendrier avec des squelettes
+  if (isLoading) {
+    const skeletonCountPerDay = 3;
+    return (
+      <div className="weekly-calendar">
+        <div className="calendar-header">
+          <h2 className="section-title">{t('calendar.title', { defaultValue: 'Calendrier des sorties' })}</h2>
+          <div className="section-controls">
+            <CountrySelector
+              value={country}
+              onChange={handleCountryChange}
+              showLabel={false}
+              compact={true}
+            />
+          </div>
+        </div>
+
+        <div className="calendar-grid loading-calendar" ref={gridRef} aria-busy="true">
+          {days.map((day, dIdx) => (
+            <div className="loading-day" key={day} aria-hidden="true">
+              <div className="skeleton skeleton-header" style={{ animationDelay: `${dIdx * 20}ms` }} />
+              {Array.from({ length: skeletonCountPerDay }).map((_, i) => (
+                <div className="skeleton" key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12, animationDelay: `${(dIdx * 20) + (i * 80)}ms` }}>
+                  <div className="skeleton-item" />
+                  <div className="skeleton-lines" style={{ flex: 1 }}>
+                    <div className="skeleton-line" style={{ width: '70%' }} />
+                    <div className="skeleton-line" style={{ width: '50%', marginTop: 8 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (isError) return <div className="error-message">{error?.message || "Erreur lors de la récupération du calendrier. Veuillez réessayer plus tard."}</div>;
 
   // Les données sont disponibles
@@ -96,12 +146,7 @@ function WeeklyCalendar() {
 
   // flat list of all animes removed as platform filtering was removed
 
-  // Jours de la semaine en français
-  const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-  const daysLower = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   
-  // Jour actuel pour le mettre en évidence
-  const currentDay = new Date().getDay();
 
   
 
