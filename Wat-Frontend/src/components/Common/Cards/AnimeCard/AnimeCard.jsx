@@ -4,8 +4,15 @@ import { PlatformLogo } from '../../Media';
 import { useStreamingInfo } from '../../../../services/api';
 import { useWATTranslation } from '../../../../hooks/useWATTranslation';
 import useInView from '../../../../hooks/useInView';
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import buildProviderHref from '../../../../lib/providerLinks';
+import { useUserContext } from '../../../../context/UserContext';
+import {
+  readLocalWatchlist,
+  writeLocalWatchlist,
+  addToServerWatchlist,
+  removeFromServerWatchlist
+} from '../../../../lib/watchlist';
 
 // Helper: retourne le titre préféré selon la langue (préférer title_english sauf pour japonais)
 const getPreferredTitle = (anime, language) => {
@@ -78,6 +85,52 @@ const AnimeCard = ({
 }) => {
   const { t, language } = useWATTranslation();
 
+  // Expose current user (if logged via Discord) and a flag — used for server-side watchlist sync
+  const { user, isAuthenticated } = useUserContext() || { user: null, isAuthenticated: false };
+  const [inList, setInList] = useState(false);
+
+  useEffect(() => {
+    try {
+      const idKey = anime?.mal_id || anime?.id || anime?.slug;
+      const local = readLocalWatchlist();
+      const found = local.some(i => (i.mal_id || i.id || i.slug) === idKey);
+      setInList(!!found);
+    } catch (err) {
+      // ignore
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anime?.mal_id, anime?.id, anime?.slug]);
+
+  const toggleWatchlist = async (ev) => {
+    ev && ev.stopPropagation && ev.stopPropagation();
+    const idKey = anime?.mal_id || anime?.id || anime?.slug;
+    if (!idKey) return;
+
+    if (inList) {
+      const next = readLocalWatchlist().filter(i => (i.mal_id || i.id || i.slug) !== idKey);
+      writeLocalWatchlist(next);
+      setInList(false);
+      if (isAuthenticated) {
+        try { await removeFromServerWatchlist(idKey); } catch (e) { /* ignore */ }
+      }
+    } else {
+      const newItem = {
+        mal_id: anime.mal_id,
+        id: anime.id,
+        slug: anime.slug,
+        title: anime.title,
+        title_english: anime.title_english,
+        images: anime.images
+      };
+      const next = [newItem, ...readLocalWatchlist()];
+      writeLocalWatchlist(next);
+      setInList(true);
+      if (isAuthenticated) {
+        try { await addToServerWatchlist(newItem); } catch (e) { /* ignore */ }
+      }
+    }
+  };
+
   // Requirement: only display card if we have an English title AND a TMDB id (present or resolvable)
   const englishFromList = Array.isArray(anime.titles) ? (anime.titles.find(t => t.type === 'English') || {}).title : null;
   const hasEnglish = !!(anime.title_english || englishFromList);
@@ -141,6 +194,8 @@ const AnimeCard = ({
   };
 
   const statusInfo = getStatusInfo(status);
+
+  
 
   // Format broadcast day
   const broadcastDay = broadcast?.day || 'TBA';
@@ -255,6 +310,7 @@ const AnimeCard = ({
             {t('anime.watch', 'Regarder')}
           </button>
         </div>
+
       </div>
 
       <div className="anime-content">
@@ -320,13 +376,17 @@ const AnimeCard = ({
         {/* Actions */}
         <div className="anime-actions">
           <div className="action-buttons">
-            <button className="action-btn" title={t('anime.addToList', 'Ajouter à ma liste')}>
-              ❤
-            </button>
-            <button className="action-btn" title={t('anime.markAsWatched', 'Marquer comme vu')}>
-              ✓
-            </button>
-            <button className="action-btn" title={t('anime.share', 'Partager')}>
+            {isAuthenticated && (
+              <>
+                <button className="action-btn" title={t('anime.addToList', 'Ajouter à ma liste')} onClick={(e) => { e.stopPropagation(); toggleWatchlist(e); }}>
+                  {inList ? '❤' : '♡'}
+                </button>
+                <button className="action-btn" title={t('anime.markAsWatched', 'Marquer comme vu')} onClick={(e) => e.stopPropagation()}>
+                  ✓
+                </button>
+              </>
+            )}
+            <button className="action-btn" title={t('anime.share', 'Partager')} onClick={(e) => e.stopPropagation()}>
               📤
             </button>
           </div>

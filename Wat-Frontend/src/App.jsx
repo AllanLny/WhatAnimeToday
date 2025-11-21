@@ -9,6 +9,7 @@ const Home = React.lazy(() => import('./pages/Home/Home'));
 const WeeklyCalendar = React.lazy(() => import('./pages/Calendar/WeeklyCalendar'));
 const Settings = React.lazy(() => import('./pages/Settings/Settings'));
 const Login = React.lazy(() => import('./pages/Login/Login'));
+const WatchList = React.lazy(() => import('./pages/WatchList/WatchList'));
 // Render Header globally so it's present on all routes (e.g. /calendar)
 const Header = React.lazy(() => import('./components/Layout/Header'));
 
@@ -49,7 +50,7 @@ function App() {
                 <Route path="/calendar" element={<WeeklyCalendar />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/watchlist" element={<div>Watchlist (à venir)</div>} />
+                <Route path="/watchlist" element={<WatchList />} />
                 <Route path="/trending" element={<div>Tendances (à venir)</div>} />
               </Routes>
             </Suspense>

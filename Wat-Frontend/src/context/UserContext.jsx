@@ -14,6 +14,20 @@ export const UserProvider = ({ children }) => {
     return savedCountry || 'FR'; // Code pays par défaut (France)
   });
 
+  // User object from server session (Discord) — fetched once on mount
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(json => {
+        if (!mounted) return;
+        if (json && Object.keys(json).length > 0) setUser(json);
+      }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
   // Mettre à jour le localStorage quand le pays change
   useEffect(() => {
     localStorage.setItem('userCountry', country);
@@ -23,6 +37,8 @@ export const UserProvider = ({ children }) => {
   const value = {
     country,
     setCountry,
+    user,
+    isAuthenticated: !!user,
   };
 
   return (

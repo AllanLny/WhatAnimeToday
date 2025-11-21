@@ -4,8 +4,9 @@
 .weekly-calendar {
   // Contrainte de largeur pour laisser respirer les côtés et s'aligner
   // visuellement avec les autres pages (hero, sections principales)
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
+  margin-top: 30px;
 
   padding: 0 vars.$spacing-lg;
 

@@ -1,0 +1,77 @@
+@use '../../variables' as vars;
+
+.watchlist-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: vars.spacing('2xl');
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: vars.spacing('md');
+    margin-bottom: vars.spacing('lg');
+
+    h1 {
+      font-size: vars.font-size('3xl');
+      font-weight: 700;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: vars.spacing('sm');
+
+      .view-toggle {
+        height: 36px;
+        display: flex;
+        background: vars.color('bg-secondary');
+        border-radius: vars.radius('lg');
+        padding: 2px;
+        .toggle-btn { 
+          border: none; background: transparent; padding: 6px 10px; cursor: pointer; color: vars.color('text-secondary');
+        }
+        .toggle-btn.active { color: vars.color('text-primary'); }
+      }
+
+      .clear-btn {
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.06);
+        padding: 8px 12px;
+        border-radius: vars.radius('md');
+        cursor: pointer;
+      }
+    }
+  }
+
+  .page-content {
+    min-height: 240px;
+
+    .empty-state {
+      text-align: center;
+      padding: vars.spacing('4xl') 0;
+
+      .empty-icon { font-size: 48px; margin-bottom: vars.spacing('md'); }
+      .empty-title { font-size: vars.font-size('2xl'); margin-bottom: vars.spacing('sm'); }
+      .empty-message { color: vars.color('text-muted'); margin-bottom: vars.spacing('lg'); }
+      .cta-button { display: inline-block; padding: 10px 16px; border-radius: vars.radius('md'); background: vars.color('primary'); color: white; text-decoration: none; }
+    }
+
+    .anime-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+
+      &.list-view {
+        display: block;
+        .watchlist-item { margin-bottom: 12px; display: flex; gap: 12px; align-items: flex-start; }
+      }
+
+      .watchlist-item {
+        position: relative;
+        .watchlist-actions { position: absolute; right: 8px; top: 8px; display: flex; gap: 8px; }
+        .remove-btn { background: rgba(0,0,0,0.5); color: #fff; border: none; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+      }
+    }
+  }
+}
