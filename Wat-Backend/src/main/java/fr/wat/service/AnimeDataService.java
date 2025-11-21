@@ -313,6 +313,64 @@ public class AnimeDataService {
                 System.err.println("⚠️ Error while fetching schedule for " + jikanPath + ": " + e.getMessage());
             }
 
+            // If a country filter is provided, try to filter the day's schedule to items
+            // that are available in that country (by checking providers). This is best-effort
+            // and will skip filtering when TMDB API key is missing to avoid extra work.
+            try {
+                String normalizedCountry = (country == null || country.isBlank()) ? "" : CountryValidator.normalizeCountry(country);
+                if (normalizedCountry != null && !normalizedCountry.isBlank() && this.tmdbApiKey != null && !this.tmdbApiKey.isBlank() && arr != null && arr.size() > 0) {
+                    ArrayNode filtered = objectMapper.createArrayNode();
+                    for (JsonNode item : arr) {
+                        try {
+                            // Build an anime identifier: prefer mal_id if present, otherwise title
+                            String animeIdStr = null;
+                            if (item.has("mal_id") && !item.get("mal_id").isNull()) animeIdStr = item.get("mal_id").asText();
+                            else if (item.has("id") && !item.get("id").isNull()) animeIdStr = item.get("id").asText();
+                            else if (item.has("title") && !item.get("title").isNull()) animeIdStr = item.get("title").asText();
+                            else if (item.has("attributes") && item.get("attributes").has("canonicalTitle")) animeIdStr = item.get("attributes").get("canonicalTitle").asText();
+
+                            boolean keep = false;
+                            // quick check: if the item was previously marked with source_country (from aggregation), respect it
+                            if (item.has("source_country") && !item.get("source_country").isNull()) {
+                                String src = item.get("source_country").asText();
+                                if (src != null && src.equalsIgnoreCase(normalizedCountry)) keep = true;
+                            }
+
+                            if (!keep && animeIdStr != null && !animeIdStr.isBlank()) {
+                                // Backoff if recent failures resolving this anime
+                                Long lastFail = detailFailureTimestamps.getOrDefault(animeIdStr, 0L);
+                                long now = System.currentTimeMillis();
+                                if ((now - lastFail) < DETAIL_FAILURE_COOLDOWN_MS) {
+                                    // skip checking this anime for now
+                                    keep = false;
+                                } else {
+                                    try {
+                                        JsonNode provs = getStreamingPlatforms(animeIdStr, normalizedCountry, "");
+                                        if (provs != null && provs.has("data") && provs.get("data").isArray() && provs.get("data").size() > 0) {
+                                            keep = true;
+                                        }
+                                    } catch (Exception e) {
+                                        // mark failure to avoid repeated lookups
+                                        detailFailureTimestamps.put(animeIdStr, System.currentTimeMillis());
+                                    }
+                                }
+                            }
+
+                            if (keep) filtered.add(item);
+                        } catch (Exception e) {
+                            // ignore per-item errors
+                        }
+                    }
+                    arr = filtered;
+                } else if (normalizedCountry == null || normalizedCountry.isBlank()) {
+                    // no country filter -> keep arr as is
+                } else if (this.tmdbApiKey == null || this.tmdbApiKey.isBlank()) {
+                    System.err.println("ℹ️ TMDB API key missing — skipping country-specific filtering for weekly schedule");
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Error while applying country filter for day " + d + ": " + e.getMessage());
+            }
+
             week.set(d, arr);
 
             // small delay between day requests to be gentle with external APIs

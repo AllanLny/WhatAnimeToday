@@ -80,6 +80,12 @@
   margin-bottom: vars.$spacing-lg;
   /* Allow horizontal scrolling when there are many columns or when columns have a min-width */
   overflow-x: auto;
+  /* Allow children to overflow vertically (hover lift) so shadows / transforms are not clipped */
+  overflow-y: visible;
+  /* reserve space at the top so lifted columns don't visually get clipped
+    This keeps columns aligned while allowing a visible hover lift */
+  padding-top: 12px;
+  box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
   /* show a subtle fade on the right to hint scrollability */
   position: relative;
@@ -108,16 +114,22 @@
   min-height: 260px;
   /* Ensure each column keeps a readable width; if the container is too small this forces horizontal scroll */
   min-width: 260px;
+  position: relative; /* allow z-index to elevate this element above siblings */
+  will-change: transform; /* hint to browser for smoother hover */
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  /* keep columns aligned with a dedicated grid padding; no per-column margin */
 
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+  /* lift slightly; grid padding-top reserves space so this doesn't clip */
+  transform: translateY(-10px);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+    z-index: 10; /* keep hovered column visually above others so the top doesn't get hidden */
   }
 
   &.current-day {
     border-color: vars.$color-primary;
     box-shadow: 0 8px 28px rgba(88,101,242,0.08);
+    z-index: 2; /* slightly above default columns to be visible but below hovered */
   }
 
   h2 {
@@ -205,12 +217,17 @@
   top: 0;
   right: 0;
   height: 100%;
-  width: 48px;
-  background: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.4));
+  width: 36px;
+  /* subtler gradient so it doesn't produce a heavy vertical band */
+  background: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.12));
   transition: opacity 200ms ease;
 }
 
-/* The gradient hint is intentionally left always available; JS can toggle visibility later if needed */
+/* The gradient hint is intentionally left available; JS will hide it once we auto-center the current day */
+
+.calendar-grid.centered::after {
+  opacity: 0;
+}
 
 .view-toggles {
   display: flex;

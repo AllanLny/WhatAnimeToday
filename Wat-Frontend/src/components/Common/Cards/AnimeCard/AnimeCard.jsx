@@ -5,6 +5,7 @@ import { useStreamingInfo } from '../../../../services/api';
 import { useWATTranslation } from '../../../../hooks/useWATTranslation';
 import useInView from '../../../../hooks/useInView';
 import { memo } from 'react';
+import buildProviderHref from '../../../../lib/providerLinks';
 
 // Helper: retourne le titre préféré selon la langue (préférer title_english sauf pour japonais)
 const getPreferredTitle = (anime, language) => {
@@ -31,60 +32,10 @@ const StreamingPlatforms = ({ anime, country, language }) => {
 
   const visible = platforms.slice(0, 4);
 
-  // Centralisé: construit un lien utilisateur-friendly pour une plateforme
+  // Use shared util to build provider links (keeps URL construction consistent across the app)
   const buildProviderLink = (plat) => {
-    const rawName = (plat.normalized_name || plat.provider_name || '').toString().toLowerCase();
     const titleForQuery = getPreferredTitle(anime, language) || anime.title || anime.canonicalTitle || '';
-    const q = encodeURIComponent(titleForQuery);
-
-    // Si backend a fourni un lien direct, on le priorise
-    if (plat.link) {
-      return plat.link;
-    }
-
-    const mapping = {
-      'crunchyroll': `https://www.crunchyroll.com/fr/search?query=${q}`,
-      'netflix': `https://www.netflix.com/search?q=${q}`,
-      'prime video': `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`,
-      'primevideo': `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`,
-      'hulu': `https://www.hulu.com/search?q=${q}`,
-      'funimation': `https://www.funimation.com/search/?q=${q}`,
-      'disney+': `https://www.disneyplus.com/search/${q}`,
-      'disney plus': `https://www.disneyplus.com/search/${q}`,
-      'adn': `https://www.adnanime.com/recherche/?q=${q}`,
-      'hidive': `https://www.hidive.com/search?q=${q}`,
-      'hbo max': `https://www.hbomax.com/search?q=${q}`,
-      'paramount+': `https://www.paramountplus.com/search/?q=${q}`,
-      'apple tv+': `https://tv.apple.com/search?term=${q}`,
-      'appletv': `https://tv.apple.com/search?term=${q}`
-    };
-
-    if (mapping[rawName]) return mapping[rawName];
-
-    // Fallback: recherche Google ciblée sur le nom du provider si on a un domaine connu
-    const domainMap = {
-      'crunchyroll': 'crunchyroll.com',
-      'netflix': 'netflix.com',
-      'prime video': 'primevideo.com',
-      'primevideo': 'primevideo.com',
-      'hulu': 'hulu.com',
-      'funimation': 'funimation.com',
-      'disney+': 'disneyplus.com',
-      'disney plus': 'disneyplus.com',
-      'adn': 'adnanime.com',
-      'hidive': 'hidive.com',
-      'hbo max': 'hbomax.com',
-      'paramount+': 'paramountplus.com',
-      'apple tv+': 'tv.apple.com',
-      'appletv': 'tv.apple.com'
-    };
-
-    if (domainMap[rawName]) {
-      return `https://www.google.com/search?q=site:${domainMap[rawName]}+${q}`;
-    }
-
-    // Dernier fallback: recherche Google générique
-    return plat.link || `https://www.google.com/search?q=${q}+${encodeURIComponent(plat.provider_name || '')}`;
+    return buildProviderHref(plat, titleForQuery, country);
   };
 
   return (
