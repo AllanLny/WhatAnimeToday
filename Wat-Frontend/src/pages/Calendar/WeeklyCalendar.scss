@@ -260,51 +260,59 @@
 
 .loading-calendar {
   display: grid;
+  max-height: fit-content;
   grid-template-columns: repeat(7, 1fr);
   gap: vars.$spacing-md;
-  
+  /* Support skeletons placed inside .day-column to match final layout
+     The visual shimmer is the same as before but targets the day-column structure. */
+
+  .day-column.loading,
   .loading-day {
     background-color: vars.$color-bg-card;
     border-radius: vars.$border-radius-lg;
     padding: vars.$spacing-sm;
-      height: 260px;
-    
-    .skeleton {
-        background: linear-gradient(90deg, vars.$color-bg-hover 25%, vars.$color-bg-card 50%, vars.$color-bg-hover 75%);
-        background-size: 200% 100%;
-        animation: loading 1.5s infinite;
-        border-radius: vars.$border-radius-sm;
-        display: flex;
-        gap: vars.$spacing-sm;
-        align-items: center;
+    min-height: 260px; /* allow the column to grow naturally instead of forcing fixed height */
+
+    .skeleton,
+    .calendar-anime-card.skeleton {
+      background: linear-gradient(90deg, vars.$color-bg-hover 25%, vars.$color-bg-card 50%, vars.$color-bg-hover 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+      border-radius: vars.$border-radius-sm;
+      display: flex;
+      gap: vars.$spacing-sm;
+      align-items: center;
+      padding: vars.$spacing-sm;
     }
-    
+
     .skeleton-header {
-        height: 20px;
-        margin-bottom: vars.$spacing-sm;
+      height: 20px;
+      margin-bottom: vars.$spacing-sm;
     }
-    
-      .skeleton-item {
-        height: 102px; // match new poster height
-        margin-bottom: vars.$spacing-xs;
-        width: 72px;
-        border-radius: 8px;
-        flex: 0 0 72px;
-      }
 
-      .skeleton-lines {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: vars.$spacing-xs;
-      }
+    .skeleton-item,
+    .calendar-anime-image.skeleton-item {
+      height: 82px; // match poster height in real cards
+      margin-bottom: vars.$spacing-xs;
+      width: 56px;
+      border-radius: 8px;
+      flex: 0 0 64px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.06));
+    }
 
-      .skeleton-line {
-        height: 12px;
-        width: 80%;
-        border-radius: 6px;
-        background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.06));
-      }
+    .skeleton-lines {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: vars.$spacing-xs;
+    }
+
+    .skeleton-line {
+      height: 12px;
+      width: 80%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.06));
+    }
   }
 }
 

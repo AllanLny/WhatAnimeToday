@@ -114,17 +114,22 @@ function WeeklyCalendar() {
 
         <div className="calendar-grid loading-calendar" ref={gridRef} aria-busy="true">
           {days.map((day, dIdx) => (
-            <div className="loading-day" key={day} aria-hidden="true">
-              <div className="skeleton skeleton-header" style={{ animationDelay: `${dIdx * 20}ms` }} />
-              {Array.from({ length: skeletonCountPerDay }).map((_, i) => (
-                <div className="skeleton" key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12, animationDelay: `${(dIdx * 20) + (i * 80)}ms` }}>
-                  <div className="skeleton-item" />
-                  <div className="skeleton-lines" style={{ flex: 1 }}>
-                    <div className="skeleton-line" style={{ width: '70%' }} />
-                    <div className="skeleton-line" style={{ width: '50%', marginTop: 8 }} />
+            <div className={`day-column ${dIdx === currentDay ? 'current-day' : ''} loading`} key={day} aria-hidden="true">
+              <h2>{day}</h2>
+              <div className="anime-list">
+                {Array.from({ length: skeletonCountPerDay }).map((_, i) => (
+                  <div className="calendar-anime-card skeleton" key={i} style={{ animationDelay: `${(dIdx * 20) + (i * 80)}ms` }}>
+                    <div className="calendar-anime-image skeleton-item" />
+                    <div className="calendar-anime-info">
+                      <div className="skeleton-lines">
+                        <div className="skeleton-line" style={{ width: '70%' }} />
+                        <div className="skeleton-line" style={{ width: '50%', marginTop: 8 }} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+                {skeletonCountPerDay === 0 && <p className="no-anime-message">Aucune sortie</p>}
+              </div>
             </div>
           ))}
         </div>

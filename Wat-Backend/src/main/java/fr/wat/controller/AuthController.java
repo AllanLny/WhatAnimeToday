@@ -92,9 +92,13 @@ public class AuthController {
             // Exchange code for token
             JsonNode tokenResp = null;
             try {
+                // Add Basic Authorization header (recommended by Discord docs)
+                String basic = Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
+
                 tokenResp = wc.post()
                         .uri("https://discord.com/api/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .header("Authorization", "Basic " + basic)
                         .body(BodyInserters.fromFormData("client_id", clientId)
                                 .with("client_secret", clientSecret)
                                 .with("grant_type", "authorization_code")
@@ -103,8 +107,13 @@ public class AuthController {
                         .retrieve()
                         .bodyToMono(JsonNode.class)
                         .block();
+
+                if (tokenResp != null) {
+                    System.out.println("ℹ️ OAuth token response: " + tokenResp.toString());
+                }
             } catch (Exception ex) {
                 System.err.println("❌ OAuth token exchange failed: " + ex.getMessage());
+                ex.printStackTrace();
             }
 
             if (tokenResp == null || !tokenResp.has("access_token")) {
