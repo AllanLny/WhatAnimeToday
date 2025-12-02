@@ -22,7 +22,6 @@ app.cache.default-ttl-hours=24
 springdoc.api-docs.path=/api-docs
 springdoc.swagger-ui.path=/swagger-ui.html
 
-
 # -----------------------------------------------------------------------------
 # Discord / OAuth configuration (placeholders — use environment variables)
 # - `discord.client.id` and `discord.client.secret` are required for the OAuth code exchange
@@ -35,10 +34,39 @@ springdoc.swagger-ui.path=/swagger-ui.html
 #   export DISCORD_REDIRECT_URI="https://your.frontend.example/api/auth/discord/callback"
 #   export APP_FRONTEND_URL="http://localhost:5173"
 # -----------------------------------------------------------------------------
-discord.client.id=YOUR_CLIENT_ID
-discord.client.secret=YOUR_SECRET
-discord.redirect.uri=${DISCORD_REDIRECT_URI:http://YOUR_BACKEND_URL/api/auth/discord/callback}
+discord.client.id=your_app_client_id
+discord.client.secret=your_app_client_secret
+discord.redirect.uri=${DISCORD_REDIRECT_URI:http://localhost:8080/api/auth/discord/callback}
 
+# -----------------------------------------------------------------------------
+# Database (Postgres) - set via environment variables in local/dev
+# Recommended: set the following env vars before starting the backend:
+#   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PORT (optional)
+# Or set a full JDBC URL into SPRING_DATASOURCE_URL.
+# Example (zsh):
+#   export POSTGRES_USER=wat_user
+#   export POSTGRES_PASSWORD=change_me_secure
+#   export POSTGRES_DB=wat_db
+#   export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/wat_db"
+# -----------------------------------------------------------------------------
+# Spring datasource (uses env vars with sane defaults for local docker-compose)
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${POSTGRES_DB:wat_db}}
+spring.datasource.username=${POSTGRES_USER:wat_user}
+spring.datasource.password=${POSTGRES_PASSWORD:change_me_secure}
+spring.datasource.driver-class-name=org.postgresql.Driver
 
-# NOTE: NE PAS COMMITTER les secrets ou clés API. Utiliser les variables d'environnement
-# ou un mécanisme sécurisé pour stocker des credentials.
+# JPA / Hibernate
+# Use `validate` in prod (requires migrations applied) or `update` for quick dev iterations.
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=false
+
+# Flyway (optional) - if you want Spring Boot to run SQL migrations, add Flyway dependency
+# and set `spring.flyway.locations` to point to migration files. Current project stores
+# SQL in `Wat-Database/migrations`; to have Flyway pick them up automatically you can
+# copy them into `src/main/resources/db/migration` or configure an external filesystem
+# location (not enabled by default here).
+# Flyway: disabled by default for local development
+# Enable via application-prod.properties or -Dspring.flyway.enabled=true for production
+spring.flyway.enabled=false
+spring.flyway.locations=classpath:db/migration
+

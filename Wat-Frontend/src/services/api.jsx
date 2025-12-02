@@ -426,6 +426,24 @@ export const useGlobalStats = (country = 'FR', options = {}) => {
   });
 };
 
+// Fonction pour fetcher les détails d'un anime par son MAL ID
+// Utile pour enrichir la watchlist avec les infos complètes
+export async function fetchAnimeDetailsById(malId) {
+  try {
+    const url = buildBackendUrl(`/api/anime/${encodeURIComponent(malId)}`);
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn(`Failed to fetch anime details for ${malId}: ${response.status}`);
+      return null;
+    }
+    const data = await response.json();
+    return data?.data || data || null;
+  } catch (err) {
+    console.error('Error fetching anime details:', err);
+    return null;
+  }
+}
+
 // Export des anciennes fonctions pour compatibilité (deprecated)
 export const getTodayReleases = async () => {
   console.warn('getTodayReleases est deprecated, utilisez useTodayReleases hook');

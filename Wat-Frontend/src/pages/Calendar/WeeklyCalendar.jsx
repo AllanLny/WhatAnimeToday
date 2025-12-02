@@ -128,7 +128,7 @@ function WeeklyCalendar() {
                     </div>
                   </div>
                 ))}
-                {skeletonCountPerDay === 0 && <p className="no-anime-message">Aucune sortie</p>}
+                {skeletonCountPerDay === 0 && <p className="no-anime-message">{t('calendar.no_releases', { defaultValue: 'Aucune sortie' })}</p>}
               </div>
             </div>
           ))}
@@ -236,14 +236,14 @@ function WeeklyCalendar() {
                       </picture>
                     <div className="calendar-anime-info">
                       <h3>{anime.title_english || anime.title}</h3>
-                      <p>Épisode: {anime.broadcast?.string || 'Horaire non précisé'}</p>
+                      <p>{t('calendar.episode_label', { defaultValue: 'Épisode:' })} {anime.broadcast?.string || t('calendar.unknown_time', { defaultValue: 'Horaire non précisé' })}</p>
                       <div className="available-platforms">
                         <WeeklyStreamingPlatforms anime={anime} />
                       </div>
                     </div>
                   </div>
                 )) : (
-                  <p className="no-anime-message">Aucune sortie</p>
+                  <p className="no-anime-message">{t('calendar.no_releases', { defaultValue: 'Aucune sortie' })}</p>
                 )}
               </div>
             </div>

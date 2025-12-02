@@ -927,6 +927,57 @@ public class AnimeDataService {
     }
 
     /**
+     * Fetch anime details by MAL ID from Jikan
+     * Used by watchlist to enrich anime cards on new devices
+     */
+    @Cacheable(value = "animeDetails", key = "#malId")
+    public JsonNode getAnimeDetailsByMalId(String malId) {
+        System.out.println("🎬 Fetching anime details for MAL ID: " + malId);
+        try {
+            JsonNode response = jikanClient.get()
+                    .uri("/anime/{id}/full", malId)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
+            
+            if (response != null && response.has("data")) {
+                JsonNode data = response.get("data");
+                // Extract relevant fields for display
+                ObjectNode result = objectMapper.createObjectNode();
+                result.put("mal_id", data.has("mal_id") ? data.get("mal_id").asInt() : null);
+                result.put("title", data.has("title") ? data.get("title").asText() : null);
+                result.put("title_english", data.has("title_english") ? data.get("title_english").asText() : null);
+                result.put("synopsis", data.has("synopsis") ? data.get("synopsis").asText() : null);
+                result.put("score", data.has("score") ? data.get("score").asDouble() : null);
+                result.put("year", data.has("year") ? data.get("year").asInt() : null);
+                result.put("status", data.has("status") ? data.get("status").asText() : null);
+                result.put("episodes", data.has("episodes") ? data.get("episodes").asInt() : null);
+                
+                // Include images
+                if (data.has("images")) {
+                    result.set("images", data.get("images"));
+                }
+                
+                // Include broadcast info
+                if (data.has("broadcast")) {
+                    result.set("broadcast", data.get("broadcast"));
+                }
+                
+                // Include genres
+                if (data.has("genres")) {
+                    result.set("genres", data.get("genres"));
+                }
+                
+                System.out.println("✅ Retrieved anime details: " + result.get("title").asText());
+                return result;
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error fetching anime details for MAL ID " + malId + ": " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
      * Map raw provider names to a canonical normalized key used by the frontend asset map.
      * Examples: "Crunchyroll (Amazon Channel)" -> "crunchyroll"
      */

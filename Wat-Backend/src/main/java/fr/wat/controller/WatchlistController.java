@@ -2,98 +2,172 @@ package fr.wat.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import fr.wat.model.UserEntity;
+import fr.wat.model.WatchlistItem;
+import fr.wat.repository.UserRepository;
+import fr.wat.service.WatchlistService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Iterator;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
- * Simple per-session watchlist controller.
- * Stores a user's watchlist in the HTTP session (demo only).
+ * Watchlist controller with database persistence and Discord authentication.
+ * Stores a user's watchlist in the database, synced across devices.
  */
 @RestController
 @RequestMapping("/api/user")
 public class WatchlistController {
 
     private final ObjectMapper mapper = new ObjectMapper();
+    private final WatchlistService watchlistService;
+    private final UserRepository userRepository;
 
-    private ArrayNode getSessionList(HttpSession session) {
-        if (session == null) return mapper.createArrayNode();
-        Object obj = session.getAttribute("watchlist");
-        if (obj instanceof ArrayNode) return (ArrayNode) obj;
-        if (obj instanceof JsonNode && ((JsonNode) obj).isArray()) return (ArrayNode) obj;
-        return mapper.createArrayNode();
+    @Autowired
+    public WatchlistController(WatchlistService watchlistService, UserRepository userRepository) {
+        this.watchlistService = watchlistService;
+        this.userRepository = userRepository;
+    }
+
+    // Helper: extract Discord user info from session
+    private UserEntity getAuthenticatedUser(HttpServletRequest req) {
+        HttpSession session = req.getSession(false);
+        if (session == null) return null;
+
+        JsonNode discordUser = (JsonNode) session.getAttribute("discord_user");
+        if (discordUser == null) {
+            System.out.println("⚠️ No Discord user in session");
+            return null;
+        }
+
+        String discordId = discordUser.has("id") ? discordUser.get("id").asText() : null;
+        if (discordId == null) {
+            System.out.println("⚠️ No Discord ID in user info");
+            return null;
+        }
+
+        // Find or create user by Discord ID
+        Optional<UserEntity> existingUser = userRepository.findByDiscordId(discordId);
+        UserEntity user;
+        if (existingUser.isPresent()) {
+            user = existingUser.get();
+            // Update user info if changed
+            if (discordUser.has("username")) user.setUsername(discordUser.get("username").asText());
+            if (discordUser.has("discriminator")) user.setDiscriminator(discordUser.get("discriminator").asText());
+            if (discordUser.has("avatar")) user.setAvatar(discordUser.get("avatar").asText());
+            user.setUpdatedAt(OffsetDateTime.now());
+            user = userRepository.save(user);
+        } else {
+            // Create new user
+            user = new UserEntity();
+            user.setDiscordId(discordId);
+            if (discordUser.has("username")) user.setUsername(discordUser.get("username").asText());
+            if (discordUser.has("discriminator")) user.setDiscriminator(discordUser.get("discriminator").asText());
+            if (discordUser.has("avatar")) user.setAvatar(discordUser.get("avatar").asText());
+            user = userRepository.save(user);
+            System.out.println("✅ Created new user: " + discordId);
+        }
+
+        return user;
     }
 
     @GetMapping("/watchlist")
-    public JsonNode getWatchlist(HttpServletRequest req) {
-        HttpSession session = req.getSession(false);
-        if (session == null) return mapper.createArrayNode();
-        ArrayNode list = getSessionList(session);
-        return list;
+    public ResponseEntity<?> getWatchlist(HttpServletRequest req) {
+        UserEntity user = getAuthenticatedUser(req);
+        if (user == null) {
+            return ResponseEntity.status(401).body(mapper.createObjectNode().put("error", "Unauthorized"));
+        }
+
+        List<WatchlistItem> items = watchlistService.getForUser(user);
+        List<JsonNode> result = items.stream().map(item -> {
+            ObjectNode node = mapper.createObjectNode();
+            node.put("id", item.getId());
+            node.put("anime_id", item.getAnimeId());
+            node.put("source", item.getSource());
+            node.put("status", item.getStatus());
+            node.put("note", item.getNote());
+            node.put("added_at", item.getAddedAt().toString());
+            node.put("updated_at", item.getUpdatedAt().toString());
+            return (JsonNode) node;
+        }).collect(Collectors.toList());
+
+        System.out.println("📋 Fetched " + result.size() + " items for user " + user.getDiscordId());
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/watchlist")
-    public JsonNode addToWatchlist(HttpServletRequest req, @RequestBody JsonNode item) {
-        HttpSession session = req.getSession(true);
-        ArrayNode list = getSessionList(session);
-
-        // avoid duplicates by mal_id/id/slug
-        String id = null;
-        if (item.has("mal_id")) id = item.get("mal_id").asText();
-        else if (item.has("id")) id = item.get("id").asText();
-        else if (item.has("slug")) id = item.get("slug").asText();
-
-        boolean exists = false;
-        for (JsonNode n : list) {
-            String nid = n.has("mal_id") ? n.get("mal_id").asText() : (n.has("id") ? n.get("id").asText() : (n.has("slug") ? n.get("slug").asText() : null));
-            if (nid != null && nid.equals(id)) { exists = true; break; }
+    public ResponseEntity<?> addToWatchlist(HttpServletRequest req, @RequestBody JsonNode item) {
+        UserEntity user = getAuthenticatedUser(req);
+        if (user == null) {
+            return ResponseEntity.status(401).body(mapper.createObjectNode().put("error", "Unauthorized"));
         }
 
-        if (!exists) {
-            // ensure we store an object node
-            ObjectNode toAdd = mapper.createObjectNode();
-            if (item.has("mal_id")) toAdd.set("mal_id", item.get("mal_id"));
-            if (item.has("id")) toAdd.set("id", item.get("id"));
-            if (item.has("slug")) toAdd.set("slug", item.get("slug"));
-            if (item.has("title")) toAdd.set("title", item.get("title"));
-            if (item.has("title_english")) toAdd.set("title_english", item.get("title_english"));
-            if (item.has("images")) toAdd.set("images", item.get("images"));
-            list.insert(0, toAdd);
-            session.setAttribute("watchlist", list);
+        String animeId = null;
+        if (item.has("mal_id")) animeId = item.get("mal_id").asText();
+        else if (item.has("anime_id")) animeId = item.get("anime_id").asText();
+        else if (item.has("id")) animeId = item.get("id").asText();
+
+        if (animeId == null || animeId.isBlank()) {
+            return ResponseEntity.badRequest().body(mapper.createObjectNode().put("error", "Missing anime_id or mal_id"));
         }
 
-        return list;
+        // Create new watchlist item
+        WatchlistItem watchItem = new WatchlistItem();
+        watchItem.setUser(user);
+        watchItem.setAnimeId(animeId);
+        watchItem.setSource(item.has("source") ? item.get("source").asText() : "mal");
+        watchItem.setStatus(item.has("status") ? item.get("status").asText() : "planned");
+        watchItem.setNote(item.has("note") ? item.get("note").asText() : null);
+        watchItem.setAddedAt(OffsetDateTime.now());
+
+        try {
+            WatchlistItem saved = watchlistService.addForUser(user, watchItem);
+            System.out.println("✅ Added anime " + animeId + " to watchlist for user " + user.getDiscordId());
+
+            ObjectNode response = mapper.createObjectNode();
+            response.put("id", saved.getId());
+            response.put("anime_id", saved.getAnimeId());
+            response.put("status", saved.getStatus());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("❌ Error adding to watchlist: " + e.getMessage());
+            return ResponseEntity.badRequest().body(mapper.createObjectNode().put("error", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/watchlist/{id}")
-    public JsonNode removeFromWatchlist(HttpServletRequest req, @PathVariable String id) {
-        HttpSession session = req.getSession(false);
-        if (session == null) return mapper.createArrayNode();
-        ArrayNode list = getSessionList(session);
-
-        Iterator<JsonNode> it = list.iterator();
-        while (it.hasNext()) {
-            JsonNode n = it.next();
-            String nid = n.has("mal_id") ? n.get("mal_id").asText() : (n.has("id") ? n.get("id").asText() : (n.has("slug") ? n.get("slug").asText() : null));
-            if (nid != null && nid.equals(id)) {
-                it.remove();
-                break;
-            }
+    public ResponseEntity<?> removeFromWatchlist(HttpServletRequest req, @PathVariable String id) {
+        UserEntity user = getAuthenticatedUser(req);
+        if (user == null) {
+            return ResponseEntity.status(401).body(mapper.createObjectNode().put("error", "Unauthorized"));
         }
-        session.setAttribute("watchlist", list);
-        return list;
+
+        try {
+            Long watchlistId = Long.parseLong(id);
+            watchlistService.removeForUser(user, watchlistId);
+            System.out.println("✅ Removed watchlist item " + id + " for user " + user.getDiscordId());
+            return ResponseEntity.ok(mapper.createObjectNode().put("success", true));
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body(mapper.createObjectNode().put("error", "Invalid ID format"));
+        }
     }
 
     @PostMapping("/watchlist/clear")
-    public JsonNode clearWatchlist(HttpServletRequest req) {
-        HttpSession session = req.getSession(false);
-        if (session == null) return mapper.createArrayNode();
-        ArrayNode list = mapper.createArrayNode();
-        session.setAttribute("watchlist", list);
-        return list;
+    public ResponseEntity<?> clearWatchlist(HttpServletRequest req) {
+        UserEntity user = getAuthenticatedUser(req);
+        if (user == null) {
+            return ResponseEntity.status(401).body(mapper.createObjectNode().put("error", "Unauthorized"));
+        }
+
+        watchlistService.clearForUser(user);
+        System.out.println("✅ Cleared watchlist for user " + user.getDiscordId());
+        return ResponseEntity.ok(mapper.createObjectNode().put("success", true));
     }
 }

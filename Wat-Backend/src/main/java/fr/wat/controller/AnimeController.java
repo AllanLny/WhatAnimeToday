@@ -407,4 +407,26 @@ public class AnimeController {
             return ResponseEntity.status(500).body(err);
         }
     }
+
+    /**
+     * Récupère les détails complets d'un anime par son MAL ID
+     * Utilisé par la watchlist pour enrichir les cartes
+     */
+    @GetMapping("/{malId}")
+    public ResponseEntity<Map<String, Object>> getAnimeDetails(@PathVariable String malId) {
+        try {
+            JsonNode details = animeDataService.getAnimeDetailsByMalId(malId);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", details != null);
+            response.put("data", details);
+            response.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            errorResponse.put("timestamp", LocalDateTime.now());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
 }

@@ -81,7 +81,8 @@ const AnimeCard = ({
   anime, 
   variant = 'default', // 'default', 'compact', 'list'
   isLoading = false,
-  country = 'FR'
+  country = 'FR',
+  skipFiltering = false // If true, display card even without English title (useful for watchlist)
 }) => {
   const { t, language } = useWATTranslation();
 
@@ -120,7 +121,15 @@ const AnimeCard = ({
         slug: anime.slug,
         title: anime.title,
         title_english: anime.title_english,
-        images: anime.images
+        synopsis: anime.synopsis,
+        images: anime.images,
+        score: anime.score,
+        year: anime.year,
+        first_air_date: anime.first_air_date,
+        status: anime.status,
+        episode_count: anime.episodes,
+        genres: anime.genres,
+        broadcast: anime.broadcast
       };
       const next = [newItem, ...readLocalWatchlist()];
       writeLocalWatchlist(next);
@@ -135,8 +144,14 @@ const AnimeCard = ({
   const englishFromList = Array.isArray(anime.titles) ? (anime.titles.find(t => t.type === 'English') || {}).title : null;
   const hasEnglish = !!(anime.title_english || englishFromList);
   // Require English title and an anime id (we fetch platforms server-side by mal_id)
-  if (!hasEnglish || !(anime.mal_id || anime.id || anime.slug)) {
+  // But skip this check if skipFiltering is true (e.g., in watchlist where user already chose these animes)
+  if (!skipFiltering && (!hasEnglish || !(anime.mal_id || anime.id || anime.slug))) {
     // hide card (no english title or no TMDB match)
+    return null;
+  }
+  
+  // If skipFiltering is true, we still need at least an ID to display
+  if (skipFiltering && !(anime.mal_id || anime.id || anime.slug)) {
     return null;
   }
 
