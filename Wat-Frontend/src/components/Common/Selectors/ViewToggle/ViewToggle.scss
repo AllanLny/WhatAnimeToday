@@ -1,0 +1,79 @@
+@use '../../../../variables' as vars;
+
+.view-toggle {
+  display: flex;
+  background: vars.color('bg-secondary');
+  border-radius: vars.radius('md');
+  padding: 2px;
+  align-items: stretch;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+
+  // Fond mobile qui se déplace
+  &::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(50% - 2px);
+    height: calc(100% - 4px);
+    background: vars.color('primary');
+    border-radius: calc(#{vars.radius('md')} - 2px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
+    box-shadow: vars.shadow('sm');
+  }
+
+  // Déplacement du slider selon l'état actif
+  &.list-active::before {
+    transform: translateX(100%);
+  }
+
+  .toggle-btn {
+    background: transparent;
+    border: none;
+    padding: 0 vars.spacing('sm');
+    flex: 1;
+    height: 32px;
+    color: vars.color('text-secondary');
+    cursor: pointer;
+    transition: color 0.2s ease;
+    font-size: vars.font-size('sm');
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    border-radius: calc(#{vars.radius('md')} - 2px);
+    position: relative;
+    z-index: 2;
+
+    &:hover:not(.active) {
+      color: vars.color('text-primary');
+    }
+
+    // Style pour le bouton actif (juste la couleur du texte)
+    &.active {
+      color: white;
+    }
+
+    .icon {
+      width: 16px;
+      height: 16px;
+      transition: transform 0.2s ease;
+    }
+
+    // Petit effet sur l'icône active
+    &.active .icon {
+      transform: scale(1.05);
+    }
+  }
+
+  @media (max-width: vars.$breakpoint-md) {
+    .toggle-btn {
+      padding: 0 vars.spacing('xs');
+      min-width: 32px;
+    }
+  }
+}

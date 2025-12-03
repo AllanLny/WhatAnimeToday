@@ -7,7 +7,7 @@
 export { AnimeCard } from './Cards';
 
 // Selectors - Composants de sélection et contrôles
-export { CountrySelector, LanguageSelector } from './Selectors';
+export { CountrySelector, LanguageSelector, ViewToggle } from './Selectors';
 
 // Feedback - Composants d'état et retour utilisateur  
 export { Loading, ErrorMessage } from './Feedback';

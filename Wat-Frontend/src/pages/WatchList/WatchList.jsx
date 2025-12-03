@@ -1,10 +1,10 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
 import './WatchList.scss';
-import { CountrySelector, Loading, ErrorMessage } from '../../components/Common';
+import { Loading, ErrorMessage, ViewToggle } from '../../components/Common';
 const AnimeCard = React.lazy(() => import('../../components/Common/Cards/AnimeCard/AnimeCard'));
 import { useWATTranslation } from '../../hooks/useWATTranslation';
 import { useUserContext } from '../../context/UserContext';
-import { readLocalWatchlist, writeLocalWatchlist, fetchServerWatchlist, removeFromServerWatchlist, clearServerWatchlist, readWatchlistDetails, writeWatchlistDetails, addAnimeDetails } from '../../lib/watchlist';
+import { readLocalWatchlist, fetchServerWatchlist, readWatchlistDetails, writeWatchlistDetails, addAnimeDetails } from '../../lib/watchlist';
 import { fetchAnimeDetailsById } from '../../services/api';
 import { Link } from 'react-router-dom';
 
@@ -83,25 +83,6 @@ function WatchList() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-  const handleRemove = async (malId) => {
-    const next = (items || []).filter(i => (i.mal_id || i.id || i.slug) !== malId);
-    setItems(next);
-    if (isAuthenticated) {
-      try { await removeFromServerWatchlist(malId); } catch (e) { /* ignore */ }
-    } else {
-      writeLocalWatchlist(next);
-    }
-  };
-
-  const handleClear = async () => {
-    setItems([]);
-    if (isAuthenticated) {
-      try { await clearServerWatchlist(); } catch (e) { /* ignore */ }
-    } else {
-      writeLocalWatchlist([]);
-    }
-  };
-
   const renderEmpty = () => (
     <div className="empty-state">
       <div className="empty-icon">📚</div>
@@ -129,12 +110,10 @@ function WatchList() {
       <div className="page-header">
         <h1>{t('nav.watchlist', 'Ma Liste')}</h1>
         <div className="header-controls">
-          <CountrySelector value={country} onChange={() => {}} showLabel={false} compact={true} />
-          <div className={`view-toggle ${viewMode ? 'has-active ' + (viewMode === 'grid' ? 'grid-active' : 'list-active') : ''}`}>
-            <button className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`} onClick={() => setViewMode('grid')} aria-label={t('ui.gridView', 'Vue grille')}>▦</button>
-            <button className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')} aria-label={t('ui.listView', 'Vue liste')}>≡</button>
-          </div>
-          <button className="clear-btn" onClick={handleClear} title="Vider la watchlist">{t('ui.refresh', 'Vider')}</button>
+          <ViewToggle 
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
         </div>
       </div>
 
@@ -142,14 +121,9 @@ function WatchList() {
         {(!items || items.length === 0) ? renderEmpty() : (
           <div className={`anime-grid ${viewMode}-view`}>
             {items.map((anime) => (
-              <div key={anime.mal_id || anime.id || anime.slug} className="watchlist-item">
-                <Suspense fallback={<div style={{width: 240, height: 360}} />}>
-                  <AnimeCard anime={anime} variant={viewMode === 'list' ? 'list' : 'default'} country={country} skipFiltering={true} />
-                </Suspense>
-                <div className="watchlist-actions">
-                  <button className="remove-btn" onClick={() => handleRemove(anime.mal_id || anime.id || anime.slug)}>{t('anime.remove', 'Retirer')}</button>
-                </div>
-              </div>
+              <Suspense key={anime.mal_id || anime.id || anime.slug} fallback={<div style={{width: 240, height: 360}} />}>
+                <AnimeCard anime={anime} variant={viewMode === 'list' ? 'list' : 'default'} country={country} skipFiltering={true} />
+              </Suspense>
             ))}
           </div>
         )}

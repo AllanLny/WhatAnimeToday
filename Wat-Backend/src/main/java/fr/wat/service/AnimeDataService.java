@@ -40,9 +40,13 @@ public class AnimeDataService {
     private final java.util.concurrent.ConcurrentHashMap<String, Long> scheduleFailureTimestamps = new java.util.concurrent.ConcurrentHashMap<>();
     // Per-anime failure timestamps to avoid hammering Jikan/TMDB for items that recently failed
     private final java.util.concurrent.ConcurrentHashMap<String, Long> detailFailureTimestamps = new java.util.concurrent.ConcurrentHashMap<>();
+    // Cache for streaming platforms to avoid repeated TMDB calls for same anime
+    private final java.util.concurrent.ConcurrentHashMap<String, JsonNode> streamingCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> streamingCacheTimestamps = new java.util.concurrent.ConcurrentHashMap<>();
     private final long SCHEDULE_CACHE_TTL_MS = 5 * 60 * 1000L; // 5 minutes
     private final long SCHEDULE_FAILURE_COOLDOWN_MS = 60 * 1000L; // 1 minute cooldown after failure
     private final long DETAIL_FAILURE_COOLDOWN_MS = 5 * 60 * 1000L; // 5 minutes cooldown for per-anime failures
+    private final long STREAMING_CACHE_TTL_MS = 60 * 60 * 1000L; // 1 hour cache for streaming platforms
     // Delay between country requests when aggregating worldwide to avoid saturating external APIs
     private final long WORLDWIDE_REQUEST_DELAY_MS = 800L; // 800ms between requests
 
@@ -393,6 +397,17 @@ public class AnimeDataService {
     @Cacheable(value = "animeDetails", key = "'platforms_' + #animeId + '_' + #country + '_' + #providedTmdbId")
     public JsonNode getStreamingPlatforms(String animeId, String country, String providedTmdbId) {
         System.out.println("🔎 getStreamingPlatforms animeId=" + safe(animeId) + " country=" + safe(country) + " tmdb=" + safe(providedTmdbId));
+        
+        // Check internal cache first to avoid repeated processing
+        String cacheKey = animeId + "_" + country + "_" + providedTmdbId;
+        Long cacheTs = streamingCacheTimestamps.get(cacheKey);
+        JsonNode cached = streamingCache.get(cacheKey);
+        long now = System.currentTimeMillis();
+        
+        if (cached != null && cacheTs != null && (now - cacheTs) < STREAMING_CACHE_TTL_MS) {
+            return cached;
+        }
+        
         ObjectNode finalResult = objectMapper.createObjectNode();
         finalResult.put("query_title", "");
         finalResult.put("source", "tmdb");
@@ -412,72 +427,65 @@ public class AnimeDataService {
             String tmdbId = providedTmdbId;
             String mediaType = "tv"; // default assumption for anime
 
-            // If no TMDB id provided, try to resolve title via cached today releases first to avoid per-anime Jikan calls (rate limit)
+            // If no TMDB id provided, try to resolve title via minimal API calls to avoid rate limiting
             String titleToSearch = null;
             if ((tmdbId == null || tmdbId.isBlank()) && animeId != null && !animeId.isBlank()) {
                 try {
-                    // Try from today's cached data (one Jikan call per day via getTodayReleases)
-                    JsonNode today = getTodayReleases(normalizedCountry);
-                    if (today != null && today.has("data") && today.get("data").isArray()) {
-                        for (JsonNode item : today.get("data")) {
-                            // try matching by mal_id or id
-                            if (item.has("mal_id") && item.get("mal_id").asText().equals(animeId)) {
-                                if (item.has("title")) titleToSearch = item.get("title").asText();
-                                break;
-                            }
-                            if (item.has("id") && item.get("id").asText().equals(animeId)) {
-                                if (item.has("title")) titleToSearch = item.get("title").asText();
-                                break;
-                            }
-                            // nested attributes (kitsu style)
-                            if (item.has("attributes") && item.get("attributes").has("canonicalTitle")) {
-                                if (item.get("attributes").has("mal_id") && item.get("attributes").get("mal_id").asText().equals(animeId)) {
-                                    titleToSearch = item.get("attributes").get("canonicalTitle").asText();
-                                    break;
+                    // OPTIMIZATION: Don't call getTodayReleases here as it creates a cascade of requests
+                    // Instead, check if we have cached schedule data first
+                    boolean foundInCache = false;
+                    for (String day : Arrays.asList("monday","tuesday","wednesday","thursday","friday","saturday","sunday")) {
+                        String jikanPath = "/schedules/" + day;
+                        JsonNode scheduleDataCached = scheduleCache.get(jikanPath);
+                        if (scheduleDataCached != null) {
+                            JsonNode dataArray = scheduleDataCached.isArray() ? scheduleDataCached : (scheduleDataCached.has("data") ? scheduleDataCached.get("data") : null);
+                            if (dataArray != null && dataArray.isArray()) {
+                                for (JsonNode item : dataArray) {
+                                    if (item.has("mal_id") && item.get("mal_id").asText().equals(animeId)) {
+                                        if (item.has("title")) titleToSearch = item.get("title").asText();
+                                        foundInCache = true;
+                                        break;
+                                    }
                                 }
+                                if (foundInCache) break;
                             }
                         }
                     }
 
-                    // If not found in today's cached data, decide next step:
-                    // - If animeId looks like a numeric MAL id, fetch /anime/{id}
-                    // - If animeId looks like a title (non-numeric), treat it as titleToSearch and avoid calling Jikan by id (which returns 404)
+                    // If not found in cached schedule data, decide next step more carefully:
                     if (titleToSearch == null) {
                         boolean isNumericId = animeId != null && animeId.matches("^\\d+$");
                         if (!isNumericId) {
                             // animeId seems to be a title string — use it directly as search term
                             titleToSearch = animeId;
                         } else {
+                            // Only make individual Jikan calls if absolutely necessary and not recently failed
                             // If we recently failed resolving this anime, skip extra attempts to avoid hammering Jikan
-                            long now = System.currentTimeMillis();
+                            long currentTime = System.currentTimeMillis();
                             Long lastFail = detailFailureTimestamps.getOrDefault(animeId, 0L);
-                            if ((now - lastFail) < DETAIL_FAILURE_COOLDOWN_MS) {
+                            if ((currentTime - lastFail) < DETAIL_FAILURE_COOLDOWN_MS) {
                                 System.err.println("⚠️ Recent failure resolving animeId=" + animeId + ", skipping Jikan lookup until cooldown expires.");
                             } else {
-                                for (int attempt = 1; attempt <= 2; attempt++) {
-                                    try {
-                                        JsonNode jikanResp = jikanClient.get()
-                                                .uri(uriBuilder -> uriBuilder.path("/anime/{id}").build(animeId))
-                                                .retrieve()
-                                                .bodyToMono(JsonNode.class)
-                                                .block();
-                                        if (jikanResp != null) {
-                                            if (jikanResp.has("data")) {
-                                                JsonNode attrs = jikanResp.get("data");
-                                                if (attrs.has("title_english") && !attrs.get("title_english").isNull()) titleToSearch = attrs.get("title_english").asText();
-                                                if ((titleToSearch == null || titleToSearch.isBlank()) && attrs.has("title")) titleToSearch = attrs.get("title").asText();
-                                            } else if (jikanResp.has("title")) {
-                                                titleToSearch = jikanResp.get("title").asText();
-                                            }
+                                // RATE LIMITED: Only make ONE attempt with longer retry to avoid 429s
+                                try {
+                                    Thread.sleep(600); // Wait 600ms before individual anime request
+                                    JsonNode jikanResp = jikanClient.get()
+                                            .uri(uriBuilder -> uriBuilder.path("/anime/{id}").build(animeId))
+                                            .retrieve()
+                                            .bodyToMono(JsonNode.class)
+                                            .block();
+                                    if (jikanResp != null) {
+                                        if (jikanResp.has("data")) {
+                                            JsonNode attrs = jikanResp.get("data");
+                                            if (attrs.has("title_english") && !attrs.get("title_english").isNull()) titleToSearch = attrs.get("title_english").asText();
+                                            if ((titleToSearch == null || titleToSearch.isBlank()) && attrs.has("title")) titleToSearch = attrs.get("title").asText();
+                                        } else if (jikanResp.has("title")) {
+                                            titleToSearch = jikanResp.get("title").asText();
                                         }
-                                        if (titleToSearch != null && !titleToSearch.isBlank()) break;
-                                    } catch (Exception e) {
-                                        System.err.println("⚠️ Jikan fetch for animeId=" + animeId + " failed: " + e.getMessage());
-                                        if (e.getMessage() != null && e.getMessage().contains("429")) {
-                                            detailFailureTimestamps.put(animeId, System.currentTimeMillis());
-                                        }
-                                        try { TimeUnit.MILLISECONDS.sleep(400L * attempt); } catch (InterruptedException ignored) {}
                                     }
+                                } catch (Exception e) {
+                                    System.err.println("⚠️ Jikan fetch for animeId=" + animeId + " failed: " + e.getMessage());
+                                    detailFailureTimestamps.put(animeId, System.currentTimeMillis());
                                 }
                                 if (titleToSearch == null) {
                                     // mark failure to avoid repeated attempts in short time
@@ -661,6 +669,10 @@ public class AnimeDataService {
             finalResult.set("data", providersArr);
         }
 
+        // Cache the result
+        streamingCache.put(cacheKey, finalResult);
+        streamingCacheTimestamps.put(cacheKey, System.currentTimeMillis());
+        
         return finalResult;
     }
 

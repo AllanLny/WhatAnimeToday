@@ -22,17 +22,7 @@
       align-items: center;
       gap: vars.spacing('sm');
 
-      .view-toggle {
-        height: 36px;
-        display: flex;
-        background: vars.color('bg-secondary');
-        border-radius: vars.radius('lg');
-        padding: 2px;
-        .toggle-btn { 
-          border: none; background: transparent; padding: 6px 10px; cursor: pointer; color: vars.color('text-secondary');
-        }
-        .toggle-btn.active { color: vars.color('text-primary'); }
-      }
+      // ViewToggle styles sont maintenant dans le composant
 
       .clear-btn {
         background: transparent;

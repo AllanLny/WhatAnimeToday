@@ -150,10 +150,8 @@
         align-items: center;
         gap: vars.spacing('md');
 
-        // Styles partagés pour contrôles (sélecteur + toggle) afin d'assurer
-        // la même hauteur, radius et alignement visuel.
-        .country-selector,
-        .view-toggle {
+        // Styles pour le sélecteur de pays uniquement
+        .country-selector {
           height: 32px;
           display: inline-flex;
           align-items: center;
@@ -161,9 +159,6 @@
           background: vars.color('bg-secondary');
           border: 1px solid rgba(255, 255, 255, 0.1);
           box-shadow: none;
-        }
-
-        .country-selector {
           padding: 0 vars.spacing('md');
           color: vars.color('text-primary');
           font-size: vars.font-size('sm');
@@ -178,136 +173,6 @@
             outline: none;
             border-color: vars.color('primary');
             box-shadow: 0 0 0 3px rgba(255, 59, 59, 0.1);
-          }
-        }
-
-        .view-toggle {
-          display: flex;
-          background: vars.color('bg-secondary');
-          border-radius: vars.radius('lg');
-          padding: 2px;
-          align-items: stretch; /* ensure buttons fill the container vertically */
-          border: 0px solid rgba(255, 255, 255, 0.1);
-          box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
-          overflow: visible; /* allow active button to overflow padding */
-
-          // When a child is active, hide the middle divider by adding an overlay
-          &.has-active::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            border-radius: inherit;
-            box-shadow: none;
-          }
-
-          .toggle-btn {
-            background: transparent;
-            border: none;
-            outline: none; // Supprime le rebord au focus
-            padding: 0 vars.spacing('sm');
-            flex: 1; /* take equal width */
-            height: 100%; /* fill view-toggle inner height (accounting for padding) */
-            color: vars.color('text-secondary');
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            font-size: 14px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 40px;
-            position: relative;
-            z-index: 0;
-
-            // Border-radius adaptatif selon la position
-            &:first-child {
-              border-radius: calc(vars.radius('lg') - 2px) 0 0 calc(vars.radius('lg') - 2px);
-            }
-
-            &:last-child {
-              border-radius: 0 calc(vars.radius('lg') - 2px) calc(vars.radius('lg') - 2px) 0;
-            }
-
-            // Si un seul bouton (fallback)
-            &:only-child {
-              border-radius: calc(vars.radius('lg') - 2px);
-            }
-
-            // hover should not override active visuals - only subtle bg change, no size/margin/transform
-            &:hover {
-              background: rgba(255, 255, 255, 0.06);
-              color: vars.color('text-primary');
-            }
-
-            &.active {
-              background: vars.color('primary');
-              color: white;
-              box-shadow: 
-                0 2px 8px rgba(255, 59, 59, 0.25),
-                0 1px 3px rgba(0, 0, 0, 0.1);
-              transform: translateY(0);
-              /* overflow the parent's padding so the active background reaches the container edges */
-              margin: -2px;
-              height: calc(100% + 4px);
-              padding: 0;
-              z-index: 3;
-            }
-
-            // when active, ensure hover doesn't shift or change background
-            &.active:hover {
-              transform: translateY(0);
-              background: vars.color('primary');
-              color: white;
-            }
-
-            // When a side is active we need the active button to match the outer container radius
-            &:first-child.active {
-              border-radius: calc(vars.radius('lg')) 0 0 calc(vars.radius('lg'));
-            }
-
-            &:last-child.active {
-              border-radius: 0 calc(vars.radius('lg')) calc(vars.radius('lg')) 0;
-            }
-
-            &:focus {
-              outline: none; // Supprime complètement l'outline au focus
-              box-shadow: none; // Supprime toute ombre de focus
-            }
-
-            &:active {
-              transform: translateY(1px);
-              outline: none; // Supprime l'outline au clic
-            }
-
-            // États combinés pour plus de sécurité
-            &:focus:not(.active) {
-              background: rgba(255, 255, 255, 0.08);
-              color: vars.color('text-primary');
-            }
-
-            // Icônes modernes avec CSS
-            // icônes modernes via ::before, centrées et dimensionnées
-            .icon {
-              width: 16px;
-              height: 16px;
-              display: inline-block;
-              vertical-align: middle;
-              transition: transform 0.15s ease, opacity 0.15s ease;
-              opacity: 0.9;
-            }
-
-            &.active .icon {
-              transform: scale(1.01);
-              opacity: 1;
-            }
-
-            &:first-child.active {
-              box-shadow: 
-                0 6px 20px rgba(255, 59, 59, 0.28),
-                0 1px 6px rgba(0,0,0,0.25);
-              transform: translateY(0) scale(1.03);
-            }
           }
         }
       }

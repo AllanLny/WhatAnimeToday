@@ -25,9 +25,21 @@ CREATE TABLE IF NOT EXISTS watchlists (
   UNIQUE (user_id, anime_id, source)
 );
 
+-- refresh_tokens: persistent login tokens
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(512) UNIQUE NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
 -- Simple indexes
 CREATE INDEX IF NOT EXISTS idx_watchlists_user ON watchlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlists_anime ON watchlists(anime_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
 
 -- Optional example data (commented)
 -- INSERT INTO users (discord_id, username, discriminator) VALUES ('123456789012345678','exampleuser','1234');
@@ -51,5 +63,11 @@ CREATE TRIGGER set_timestamp_on_users
 DROP TRIGGER IF EXISTS set_timestamp_on_watchlists ON watchlists;
 CREATE TRIGGER set_timestamp_on_watchlists
   BEFORE UPDATE ON watchlists
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_on_refresh_tokens ON refresh_tokens;
+CREATE TRIGGER set_timestamp_on_refresh_tokens
+  BEFORE UPDATE ON refresh_tokens
   FOR EACH ROW
   EXECUTE FUNCTION trigger_set_timestamp();
