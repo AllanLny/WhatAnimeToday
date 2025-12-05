@@ -7,12 +7,10 @@ import useInView from '../../../../hooks/useInView';
 import { memo, useState, useEffect } from 'react';
 import buildProviderHref from '../../../../lib/providerLinks';
 import { useUserContext } from '../../../../context/UserContext';
+import { Heart, ExternalLink, Check, Star, Calendar, Tv, Clock, Play } from 'lucide-react';
 import {
-  readLocalWatchlist,
-  writeLocalWatchlist,
-  addToServerWatchlist,
-  removeFromServerWatchlist
-} from '../../../../lib/watchlist';
+  useWatchlistStatus
+} from '../../../../hooks/useWatchlist';
 
 // Helper: retourne le titre préféré selon la langue (préférer title_english sauf pour japonais)
 const getPreferredTitle = (anime, language) => {
@@ -88,57 +86,9 @@ const AnimeCard = ({
 
   // Expose current user (if logged via Discord) and a flag — used for server-side watchlist sync
   const { user, isAuthenticated } = useUserContext() || { user: null, isAuthenticated: false };
-  const [inList, setInList] = useState(false);
-
-  useEffect(() => {
-    try {
-      const idKey = anime?.mal_id || anime?.id || anime?.slug;
-      const local = readLocalWatchlist();
-      const found = local.some(i => (i.mal_id || i.id || i.slug) === idKey);
-      setInList(!!found);
-    } catch (err) {
-      // ignore
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anime?.mal_id, anime?.id, anime?.slug]);
-
-  const toggleWatchlist = async (ev) => {
-    ev && ev.stopPropagation && ev.stopPropagation();
-    const idKey = anime?.mal_id || anime?.id || anime?.slug;
-    if (!idKey) return;
-
-    if (inList) {
-      const next = readLocalWatchlist().filter(i => (i.mal_id || i.id || i.slug) !== idKey);
-      writeLocalWatchlist(next);
-      setInList(false);
-      if (isAuthenticated) {
-        try { await removeFromServerWatchlist(idKey); } catch (e) { /* ignore */ }
-      }
-    } else {
-      const newItem = {
-        mal_id: anime.mal_id,
-        id: anime.id,
-        slug: anime.slug,
-        title: anime.title,
-        title_english: anime.title_english,
-        synopsis: anime.synopsis,
-        images: anime.images,
-        score: anime.score,
-        year: anime.year,
-        first_air_date: anime.first_air_date,
-        status: anime.status,
-        episode_count: anime.episodes,
-        genres: anime.genres,
-        broadcast: anime.broadcast
-      };
-      const next = [newItem, ...readLocalWatchlist()];
-      writeLocalWatchlist(next);
-      setInList(true);
-      if (isAuthenticated) {
-        try { await addToServerWatchlist(newItem); } catch (e) { /* ignore */ }
-      }
-    }
-  };
+  
+  // Utiliser le nouveau hook pour la synchronisation de la watchlist
+  const { inList, isLoading: isWatchlistLoading, toggleWatchlist } = useWatchlistStatus(anime);
 
   // Requirement: only display card if we have an English title AND a TMDB id (present or resolvable)
   const englishFromList = Array.isArray(anime.titles) ? (anime.titles.find(t => t.type === 'English') || {}).title : null;
@@ -305,9 +255,9 @@ const AnimeCard = ({
                 });
 
                 const top = platforms[0];
-                // Some providers include a 'link' field (TMDB link); otherwise build a generic provider page
+                // Utiliser buildProviderHref pour construire le lien de redirection approprié
                 const preferredTitleForQuery = getPreferredTitle(anime, language) || displayTitle;
-                const providerLink = top.link || (`https://www.themoviedb.org/provider/${top.provider_id}`) || null || (`https://www.google.com/search?q=${encodeURIComponent(preferredTitleForQuery)}`);
+                const providerLink = buildProviderHref(top, preferredTitleForQuery, country);
                 if (providerLink) {
                   window.open(providerLink, '_blank', 'noopener');
                 } else {
@@ -321,7 +271,7 @@ const AnimeCard = ({
               }
             }}
           >
-            <span className="play-icon">▶</span>
+            <Play size={16} />
             {t('anime.watch', 'Regarder')}
           </button>
         </div>
@@ -339,26 +289,26 @@ const AnimeCard = ({
         <div className="anime-meta">
           {score && (
             <div className="meta-item rating">
-              <span className="meta-icon">⭐</span>
+              <Star size={16} fill="currentColor" />
               <span>{score.toFixed(1)}</span>
             </div>
           )}
           
           {year && (
             <div className="meta-item year">
-              <span className="meta-icon">📅</span>
+              <Calendar size={16} />
               <span>{year}</span>
             </div>
           )}
           
           <div className="meta-item episodes">
-            <span className="meta-icon">📺</span>
+            <Tv size={16} />
             <span>{episodeText}</span>
           </div>
           
           {broadcastDay !== 'TBA' && (
             <div className="meta-item broadcast">
-              <span className="meta-icon">🕒</span>
+              <Clock size={16} />
               <span>{broadcastDay} {broadcastTime}</span>
             </div>
           )}
@@ -393,16 +343,28 @@ const AnimeCard = ({
           <div className="action-buttons">
             {isAuthenticated && (
               <>
-                <button className="action-btn" title={t('anime.addToList', 'Ajouter à ma liste')} onClick={(e) => { e.stopPropagation(); toggleWatchlist(e); }}>
-                  {inList ? '❤' : '♡'}
+                <button 
+                  className={`action-btn watchlist-btn ${inList ? 'active' : ''} ${isWatchlistLoading ? 'loading' : ''}`} 
+                  title={inList ? t('anime.removeFromList', 'Retirer de ma liste') : t('anime.addToList', 'Ajouter à ma liste')} 
+                  onClick={(e) => { e.stopPropagation(); toggleWatchlist(e); }}
+                  disabled={isWatchlistLoading}
+                >
+                  {isWatchlistLoading ? (
+                    <div className="loading-spinner">⏳</div>
+                  ) : (
+                    <Heart 
+                      size={12} 
+                      fill={inList ? 'currentColor' : 'none'} 
+                    />
+                  )}
                 </button>
                 <button className="action-btn" title={t('anime.markAsWatched', 'Marquer comme vu')} onClick={(e) => e.stopPropagation()}>
-                  ✓
+                  <Check size={12} />
                 </button>
               </>
             )}
             <button className="action-btn" title={t('anime.share', 'Partager')} onClick={(e) => e.stopPropagation()}>
-              📤
+              <ExternalLink size={12} />
             </button>
           </div>
         </div>

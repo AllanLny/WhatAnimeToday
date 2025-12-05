@@ -4,7 +4,8 @@ import { Loading, ErrorMessage, ViewToggle } from '../../components/Common';
 const AnimeCard = React.lazy(() => import('../../components/Common/Cards/AnimeCard/AnimeCard'));
 import { useWATTranslation } from '../../hooks/useWATTranslation';
 import { useUserContext } from '../../context/UserContext';
-import { readLocalWatchlist, fetchServerWatchlist, readWatchlistDetails, writeWatchlistDetails, addAnimeDetails } from '../../lib/watchlist';
+import { useWatchlist } from '../../hooks/useWatchlist';
+import { readWatchlistDetails, writeWatchlistDetails, addAnimeDetails } from '../../lib/watchlist';
 import { fetchAnimeDetailsById } from '../../services/api';
 import { Link } from 'react-router-dom';
 
@@ -12,11 +13,11 @@ function WatchList() {
   const { t } = useWATTranslation();
   const { country } = useUserContext();
   const [viewMode, setViewMode] = useState('grid');
-  const [items, setItems] = useState(null);
   const [isEnriching, setIsEnriching] = useState(false);
   const containerRef = useRef(null);
 
   const { user, isAuthenticated } = useUserContext() || { user: null, isAuthenticated: false };
+  const { watchlist, isLoading } = useWatchlist();
 
   // Enrichir les animes avec les détails manquants
   const enrichAnimeDetails = async (animes) => {
@@ -60,29 +61,6 @@ function WatchList() {
     return enrichedAnimes;
   };
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (isAuthenticated) {
-        const srv = await fetchServerWatchlist();
-        if (!mounted) return;
-        
-        // Enrichir les animes avec les détails manquants
-        const enriched = await enrichAnimeDetails(srv);
-        if (!mounted) return;
-        setItems(enriched || []);
-      } else {
-        // Load watchlist from localStorage
-        const list = readLocalWatchlist();
-        if (!mounted) return;
-        setItems(list);
-      }
-    };
-    load().catch(() => { if (mounted) setItems([]); });
-    return () => { mounted = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
-
   const renderEmpty = () => (
     <div className="empty-state">
       <div className="empty-icon">📚</div>
@@ -92,7 +70,7 @@ function WatchList() {
     </div>
   );
 
-  if (items === null || isEnriching) {
+  if (isLoading || isEnriching) {
     return (
       <div className="watchlist-page">
         <div className="page-header">
@@ -118,9 +96,11 @@ function WatchList() {
       </div>
 
       <div className="page-content" ref={containerRef}>
-        {(!items || items.length === 0) ? renderEmpty() : (
+        {isLoading ? (
+          <Loading message={t('watchlist.loading', 'Chargement de votre liste...')} size="large" />
+        ) : (!watchlist || watchlist.length === 0) ? renderEmpty() : (
           <div className={`anime-grid ${viewMode}-view`}>
-            {items.map((anime) => (
+            {watchlist.map((anime) => (
               <Suspense key={anime.mal_id || anime.id || anime.slug} fallback={<div style={{width: 240, height: 360}} />}>
                 <AnimeCard anime={anime} variant={viewMode === 'list' ? 'list' : 'default'} country={country} skipFiltering={true} />
               </Suspense>

@@ -134,8 +134,9 @@
           box-shadow: vars.shadow('glow-red-strong');
         }
         
-        .play-icon {
-          font-size: vars.font-size('base');
+        svg {
+          width: 16px;
+          height: 16px;
         }
       }
     }
@@ -187,21 +188,42 @@
         font-size: vars.font-size('xs');
         color: vars.color('text-secondary');
         
-        .meta-icon {
-          font-size: vars.font-size('sm');
+        // Styles pour les icônes Lucide dans meta
+        svg {
+          width: 16px;
+          height: 16px;
+          stroke-width: 2;
         }
         
         &.rating {
           color: vars.color('accent-yellow');
           font-weight: 600;
+          
+          svg {
+            color: vars.color('accent-yellow');
+          }
         }
         
         &.year {
           color: vars.color('accent-blue');
+          
+          svg {
+            color: vars.color('accent-blue');
+          }
         }
         
         &.episodes {
           color: vars.color('accent-green');
+          
+          svg {
+            color: vars.color('accent-green');
+          }
+        }
+        
+        &.broadcast {
+          svg {
+            color: vars.color('text-secondary');
+          }
         }
       }
     }
@@ -295,8 +317,8 @@
         gap: vars.spacing('sm');
         
         .action-btn {
-          width: 36px;
-          height: 36px;
+          width: 48px;
+          height: 48px;
           border: 1px solid vars.color('border-light');
           background: vars.color('bg-secondary');
           color: vars.color('text-secondary');
@@ -307,12 +329,27 @@
           cursor: pointer;
           transition: all 0.2s ease;
           font-size: vars.font-size('sm');
+          padding: 0;
+          
+          // Styles pour les icônes Lucide
+          svg {
+            transition: all 0.2s ease;
+            width: 16px;
+            height: 16px;
+            stroke-width: 2;
+          }
           
           &:hover {
             border-color: vars.color('primary');
             background: vars.color('primary');
             color: white;
             transform: scale(1.1);
+            
+            svg {
+              transform: scale(1.2);
+              width: 18px;
+              height: 18px;
+            }
           }
           
           &.active {
@@ -320,6 +357,40 @@
             border-color: vars.color('primary');
             color: white;
           }
+          
+          // Styles spécifiques pour le bouton watchlist
+          &.watchlist-btn {
+            &.active {
+              background: vars.color('primary');
+              border-color: vars.color('primary');
+              color: white;
+              box-shadow: 0 0 10px rgba(255, 59, 59, 0.4);
+              
+              svg {
+                color: white;
+              }
+            }
+            
+            &.loading {
+              opacity: 0.6;
+              cursor: not-allowed;
+              animation: pulse 1.5s infinite;
+              
+              .loading-spinner {
+                font-size: 12px;
+              }
+            }
+            
+            &:disabled {
+              cursor: not-allowed;
+              opacity: 0.6;
+            }
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
         }
       }
     }
