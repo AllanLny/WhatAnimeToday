@@ -88,7 +88,7 @@ const AnimeCard = ({
   const { user, isAuthenticated } = useUserContext() || { user: null, isAuthenticated: false };
   
   // Utiliser le nouveau hook pour la synchronisation de la watchlist
-  const { inList, isLoading: isWatchlistLoading, toggleWatchlist } = useWatchlistStatus(anime);
+  const { inList, isLoading: isWatchlistLoading, toggleWatchlist, addMutation, removeMutation } = useWatchlistStatus(anime);
 
   // Requirement: only display card if we have an English title AND a TMDB id (present or resolvable)
   const englishFromList = Array.isArray(anime.titles) ? (anime.titles.find(t => t.type === 'English') || {}).title : null;
@@ -160,11 +160,58 @@ const AnimeCard = ({
 
   const statusInfo = getStatusInfo(status);
 
-  
+  // Fonction pour traduire les jours de la semaine
+  const translateDay = (dayName) => {
+    if (!dayName || dayName === 'TBA') return dayName;
+    
+    // Convertir le pluriel en singulier (Fridays -> Friday)
+    const singularDay = dayName.replace(/s$/, '');
+    
+    // Mapping direct selon la langue (seulement singulier)
+    const dayMappings = {
+      fr: {
+        'monday': 'Lundi',
+        'tuesday': 'Mardi',
+        'wednesday': 'Mercredi',
+        'thursday': 'Jeudi',
+        'friday': 'Vendredi',
+        'saturday': 'Samedi',
+        'sunday': 'Dimanche'
+      },
+      en: {
+        'monday': 'Monday',
+        'tuesday': 'Tuesday',
+        'wednesday': 'Wednesday',
+        'thursday': 'Thursday',
+        'friday': 'Friday',
+        'saturday': 'Saturday',
+        'sunday': 'Sunday'
+      }
+    };
+    
+    const currentLang = language?.startsWith('fr') ? 'fr' : 'en';
+    const dayKey = singularDay.toLowerCase();
+    const translatedDay = dayMappings[currentLang]?.[dayKey] || dayName;
+    
+    // Debug pour voir ce qui se passe
+    console.log(`🔍 translateDay: "${dayName}" -> singular: "${singularDay}" -> lang: "${currentLang}" -> key: "${dayKey}" -> result: "${translatedDay}"`);
+    
+    return translatedDay;
+  };
 
-  // Format broadcast day
-  const broadcastDay = broadcast?.day || 'TBA';
-  const broadcastTime = broadcast?.time || '';
+  // Formater l'affichage des horaires
+  const getBroadcastDisplay = () => {
+    const fallbackDay = broadcast?.day || 'TBA';
+    const fallbackTime = broadcast?.time || '';
+    const translatedDay = translateDay(fallbackDay);
+    
+    if (fallbackDay !== 'TBA') {
+      return `${translatedDay} ${fallbackTime} (JST)`;
+    }
+    return 'TBA';
+  };
+
+  const broadcastDisplay = getBroadcastDisplay();
 
   return (
     <div className={`anime-card ${variant}`}>
@@ -306,10 +353,10 @@ const AnimeCard = ({
             <span>{episodeText}</span>
           </div>
           
-          {broadcastDay !== 'TBA' && (
+          {broadcastDisplay && broadcastDisplay !== 'TBA' && (
             <div className="meta-item broadcast">
               <Clock size={16} />
-              <span>{broadcastDay} {broadcastTime}</span>
+              <span>{broadcastDisplay}</span>
             </div>
           )}
         </div>
@@ -352,10 +399,54 @@ const AnimeCard = ({
                   {isWatchlistLoading ? (
                     <div className="loading-spinner">⏳</div>
                   ) : (
-                    <Heart 
-                      size={12} 
-                      fill={inList ? 'currentColor' : 'none'} 
-                    />
+                    <div className={`heart-container ${
+                      addMutation.isPending ? 'adding' : removeMutation.isPending ? 'removing' : ''
+                    }`}>
+                      <svg 
+                        width="12" 
+                        height="12" 
+                        viewBox="0 0 24 24" 
+                        className={`heart-icon ${inList ? 'filled' : ''}`}
+                      >
+                        {/* Définition du gradient pour le remplissage progressif */}
+                        <defs>
+                          <linearGradient 
+                            id={`heartGradient-${anime?.mal_id || anime?.id || 'default'}`} 
+                            x1="0%" 
+                            y1="100%" 
+                            x2="0%" 
+                            y2="0%"
+                          >
+                            <stop 
+                              offset="0%" 
+                              stopColor="#ff3b3b" 
+                              stopOpacity={inList ? "1" : "0"}
+                              className="gradient-stop-start"
+                            />
+                            <stop 
+                              offset={inList ? "100%" : "0%"} 
+                              stopColor="#ff3b3b" 
+                              stopOpacity={inList ? "1" : "0"}
+                              className="gradient-stop-end"
+                            />
+                          </linearGradient>
+                        </defs>
+                        {/* Remplissage du cœur - en dessous pour l'effet de fond */}
+                        <path 
+                          d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" 
+                          fill={`url(#heartGradient-${anime?.mal_id || anime?.id || 'default'})`}
+                          className="heart-fill"
+                        />
+                        {/* Contour du cœur - par-dessus pour la définition */}
+                        <path 
+                          d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="1.5"
+                          className="heart-stroke"
+                        />
+                      </svg>
+                    </div>
                   )}
                 </button>
                 <button className="action-btn" title={t('anime.markAsWatched', 'Marquer comme vu')} onClick={(e) => e.stopPropagation()}>

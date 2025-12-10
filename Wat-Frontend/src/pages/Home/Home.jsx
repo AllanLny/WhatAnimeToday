@@ -2,10 +2,12 @@ import React, { useState, useEffect, Suspense, useRef } from 'react';
 import './Home.scss';
 import { Loading, ErrorMessage, CountrySelector, ViewToggle } from '../../components/Common';
 const AnimeCard = React.lazy(() => import('../../components/Common/Cards/AnimeCard/AnimeCard'));
+const SkeletonCard = React.lazy(() => import('../../components/Common/Cards/SkeletonCard/SkeletonCard'));
 import { useTodayReleases, useGlobalStats } from '../../services/api';
 import { useUserContext } from '../../context/UserContext';
 import { useWATTranslation } from '../../hooks/useWATTranslation';
 import { useCounterAnimation } from '../../hooks/useCounterAnimation';
+import { useProgressiveLoading } from '../../hooks/useProgressiveLoading';
 
 const Home = () => {
   const { t, formatNumber } = useWATTranslation();
@@ -61,6 +63,50 @@ const Home = () => {
     refetch();
   };
 
+  // Composant pour une carte anime avec chargement progressif
+  const ProgressiveAnimeCard = ({ anime, index, variant }) => {
+    const { ref, isLoaded, showSkeleton, skeletonDelay } = useProgressiveLoading({
+      anime,
+      index,
+      enabled: true,
+      delayPerCard: 50 // 50ms entre chaque card
+    });
+
+    if (showSkeleton) {
+      // Pour les cards avec ref (lazy loading), on utilise un div normal
+      // Pour les cards sans ref (chargement immédiat), on utilise display: contents
+      if (ref) {
+        return (
+          <div ref={ref} style={{ minHeight: '360px' }}>
+            <Suspense fallback={<div style={{width: 220, height: 320}} />}>
+              <SkeletonCard variant={variant} delay={skeletonDelay} />
+            </Suspense>
+          </div>
+        );
+      } else {
+        return (
+          <div style={{ display: 'contents' }}>
+            <Suspense fallback={<div style={{width: 220, height: 320}} />}>
+              <SkeletonCard variant={variant} delay={skeletonDelay} />
+            </Suspense>
+          </div>
+        );
+      }
+    }
+
+    return (
+      <div style={{ display: 'contents' }}>
+        <Suspense fallback={<div style={{width: 220, height: 320}} />}>
+          <AnimeCard 
+            anime={anime} 
+            variant={variant}
+            country={country}
+          />
+        </Suspense>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -97,14 +143,13 @@ const Home = () => {
     if (animesAujourdhui.length < 12) {
       return (
         <div className={`anime-grid ${viewMode}-view`} ref={containerRef}>
-          {animesAujourdhui.map((anime) => (
-            <Suspense key={anime.mal_id} fallback={<div style={{width: 220, height: 320}} />}>
-              <AnimeCard 
-                anime={anime} 
-                variant={viewMode === 'list' ? 'list' : 'default'}
-                country={country}
-              />
-            </Suspense>
+          {animesAujourdhui.map((anime, index) => (
+            <ProgressiveAnimeCard 
+              key={anime.mal_id}
+              anime={anime}
+              index={index}
+              variant={viewMode === 'list' ? 'list' : 'default'}
+            />
           ))}
         </div>
       );
@@ -196,7 +241,9 @@ const Home = () => {
         const prefetchCount = 3; // keep small
         animesAujourdhui.slice(0, prefetchCount).forEach(anime => {
           const animeId = anime.title || anime.canonicalTitle || anime.mal_id || anime.id || anime.slug;
-          queryClient.prefetchQuery(['animePlatforms', animeId, country], () => fetch(`/api/anime/anime/${encodeURIComponent(animeId)}/platforms?country=${country}`).then(r => r.json()), {
+          queryClient.prefetchQuery({
+            queryKey: ['animePlatforms', animeId, country], 
+            queryFn: () => fetch(`/api/anime/anime/${encodeURIComponent(animeId)}/platforms?country=${country}`).then(r => r.json()), 
             staleTime: 1000 * 60 * 60,
             cacheTime: 1000 * 60 * 60
           });

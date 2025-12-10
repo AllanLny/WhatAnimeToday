@@ -116,12 +116,31 @@ const resources = {
         watchOn: "Regarder sur",
         streamingOn: "Diffusé sur",
         addToList: "Ajouter à ma liste",
+        removeFromList: "Retirer de ma liste",
         moreInfo: "Plus d'infos",
         synopsis: "Synopsis",
         watch: "Regarder",
         available: "Disponible",
         markAsWatched: "Marquer comme vu",
         share: "Partager",
+        translationDelay: "délai trad.",
+        loading: "Chargement...",
+        days: {
+          monday: "Lundi",
+          mondays: "Lundis",
+          tuesday: "Mardi",
+          tuesdays: "Mardis",
+          wednesday: "Mercredi",
+          wednesdays: "Mercredis",
+          thursday: "Jeudi",
+          thursdays: "Jeudis",
+          friday: "Vendredi",
+          fridays: "Vendredis",
+          saturday: "Samedi",
+          saturdays: "Samedis",
+          sunday: "Dimanche",
+          sundays: "Dimanches"
+        },
         status: {
           airing: "En cours",
           completed: "Terminé",
@@ -154,7 +173,8 @@ const resources = {
         UK: "Royaume-Uni",
         DE: "Allemagne",
         ES: "Espagne",
-        IT: "Italie"
+        IT: "Italie",
+        WW: "Mondial"
       },
 
       // 🎛️ Interface utilisateur
@@ -295,12 +315,24 @@ const resources = {
         watchOn: "Watch on",
         streamingOn: "Streaming on",
         addToList: "Add to my list",
+        removeFromList: "Remove from my list",
         moreInfo: "More info",
         synopsis: "Synopsis",
         watch: "Watch",
         available: "Available",
         markAsWatched: "Mark as watched",
         share: "Share",
+        translationDelay: "translation delay",
+        loading: "Loading...",
+        days: {
+          monday: "Monday",
+          tuesday: "Tuesday",
+          wednesday: "Wednesday",
+          thursday: "Thursday",
+          friday: "Friday",
+          saturday: "Saturday",
+          sunday: "Sunday"
+        },
         status: {
           airing: "Currently Airing",
           completed: "Completed",

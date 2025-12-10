@@ -169,6 +169,15 @@ public class AnimeDataService {
             data.add(a3);
         }
 
+        // Enrichir chaque anime avec les horaires locaux adaptés au pays
+        if (data != null && data.isArray()) {
+            for (JsonNode animeNode : data) {
+                if (animeNode.isObject()) {
+                    enrichBroadcastTiming((ObjectNode) animeNode, normalizedCountry);
+                }
+            }
+        }
+
         out.set("data", data);
         return out;
     }
@@ -945,20 +954,26 @@ public class AnimeDataService {
     @Cacheable(value = "animeDetails", key = "#malId")
     public JsonNode getAnimeDetailsByMalId(String malId) {
         System.out.println("🎬 Fetching anime details for MAL ID: " + malId);
-        try {
-            JsonNode response = jikanClient.get()
-                    .uri("/anime/{id}/full", malId)
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
-                    .block();
-            
-            if (response != null && response.has("data")) {
-                JsonNode data = response.get("data");
-                // Extract relevant fields for display
-                ObjectNode result = objectMapper.createObjectNode();
-                result.put("mal_id", data.has("mal_id") ? data.get("mal_id").asInt() : null);
-                result.put("title", data.has("title") ? data.get("title").asText() : null);
-                result.put("title_english", data.has("title_english") ? data.get("title_english").asText() : null);
+        
+        // Retry logic pour gérer le rate limiting de Jikan
+        int maxRetries = 3;
+        long baseDelayMs = 1000; // 1 seconde
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                JsonNode response = jikanClient.get()
+                        .uri("/anime/{id}/full", malId)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
+                
+                if (response != null && response.has("data")) {
+                    JsonNode data = response.get("data");
+                    // Extract relevant fields for display
+                    ObjectNode result = objectMapper.createObjectNode();
+                    result.put("mal_id", data.has("mal_id") ? data.get("mal_id").asInt() : null);
+                    result.put("title", data.has("title") ? data.get("title").asText() : null);
+                    result.put("title_english", data.has("title_english") ? data.get("title_english").asText() : null);
                 result.put("synopsis", data.has("synopsis") ? data.get("synopsis").asText() : null);
                 result.put("score", data.has("score") ? data.get("score").asDouble() : null);
                 result.put("year", data.has("year") ? data.get("year").asInt() : null);
@@ -984,7 +999,23 @@ public class AnimeDataService {
                 return result;
             }
         } catch (Exception e) {
-            System.err.println("❌ Error fetching anime details for MAL ID " + malId + ": " + e.getMessage());
+            String errorMsg = e.getMessage();
+            if (errorMsg.contains("429") && attempt < maxRetries) {
+                long delayMs = baseDelayMs * attempt; // Backoff exponentiel
+                System.out.println("⏳ Rate limited (attempt " + attempt + "/" + maxRetries + "), retrying in " + delayMs + "ms for MAL ID: " + malId);
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                continue; // Retry
+            }
+            System.err.println("❌ Error fetching anime details for MAL ID " + malId + " (attempt " + attempt + "): " + errorMsg);
+            if (attempt == maxRetries) {
+                break; // Arrêter après le dernier essai
+            }
+        }
         }
         return null;
     }
@@ -1009,5 +1040,131 @@ public class AnimeDataService {
         if (s.contains("anime") && s.contains("digital")) return "adn";
         // fallback: remove punctuation and collapse spaces
         return s.replaceAll("[^a-z0-9+ ]"," ").replaceAll("\\s+"," ").trim();
+    }
+    
+    /**
+     * Enrichit les données de broadcast avec l'horaire local adapté au pays
+     * @param animeNode L'objet anime à enrichir
+     * @param country Code pays pour le calcul
+     */
+    private void enrichBroadcastTiming(ObjectNode animeNode, String country) {
+        if (!animeNode.has("broadcast") || animeNode.get("broadcast").isNull()) {
+            return;
+        }
+        
+        ObjectNode broadcast = (ObjectNode) animeNode.get("broadcast");
+        String day = broadcast.path("day").asText("");
+        String time = broadcast.path("time").asText("");
+        String timezone = broadcast.path("timezone").asText("Asia/Tokyo");
+        
+        if (day.isEmpty() || time.isEmpty()) {
+            return;
+        }
+        
+        try {
+            // Calculer l'horaire local + 1h délai traduction
+            Map<String, Object> localTiming = calculateLocalTiming(day, time, timezone, country);
+            
+            // Remplacer les valeurs dans broadcast
+            if (localTiming.containsKey("local_day")) {
+                broadcast.put("day", (String) localTiming.get("local_day"));
+            }
+            if (localTiming.containsKey("local_time")) {
+                broadcast.put("time", (String) localTiming.get("local_time"));
+            }
+            if (localTiming.containsKey("local_timezone")) {
+                broadcast.put("timezone", (String) localTiming.get("local_timezone"));
+            }
+            
+            // Ajouter des métadonnées
+            broadcast.put("is_localized", true);
+            broadcast.put("translation_delay_applied", true);
+            
+        } catch (Exception e) {
+            System.err.println("⚠️ Erreur lors du calcul d'horaire local: " + e.getMessage());
+            // En cas d'erreur, laisser les données originales
+        }
+    }
+    
+    /**
+     * Calcule l'horaire local basé sur le décalage avec le Japon + 1h délai
+     * @param japanDay Jour au Japon (ex: "Fridays")
+     * @param japanTime Heure au Japon (ex: "24:00")
+     * @param japanTimezone Fuseau japonais (ex: "Asia/Tokyo")
+     * @param country Code pays de destination
+     * @return Map avec les horaires locaux
+     */
+    private Map<String, Object> calculateLocalTiming(String japanDay, String japanTime, String japanTimezone, String country) {
+        Map<String, Object> result = new HashMap<>();
+        
+        // Décalages horaires par rapport au Japon (JST = UTC+9)
+        Map<String, Integer> timeOffsets = Map.of(
+            "FR", -8,  // France: UTC+1, donc -8h par rapport à JST
+            "US", -14, // US East Coast: UTC-5, donc -14h par rapport à JST  
+            "GB", -9,  // UK: UTC+0, donc -9h par rapport à JST
+            "DE", -8,  // Allemagne: UTC+1, donc -8h par rapport à JST
+            "ES", -8,  // Espagne: UTC+1, donc -8h par rapport à JST
+            "IT", -8   // Italie: UTC+1, donc -8h par rapport à JST
+        );
+        
+        int offsetHours = timeOffsets.getOrDefault(country, -8);
+        int subtitleDelay = 1; // 1h de délai pour sous-titrage
+        int totalOffset = offsetHours + subtitleDelay;
+        
+        // Convertir le pluriel en singulier pour cohérence
+        String singularDay = japanDay.endsWith("s") ? japanDay.substring(0, japanDay.length() - 1) : japanDay;
+        
+        // Calculer l'heure locale
+        String localTime = japanTime; // Par défaut
+        String localDay = singularDay; // Par défaut
+        
+        try {
+            if ("24:00".equals(japanTime)) {
+                // 24:00 au Japon = 00:00 du lendemain
+                int localHour = (24 + totalOffset) % 24;
+                if (localHour < 0) localHour += 24;
+                localTime = String.format("%02d:00", localHour);
+                
+                // Si le décalage est très négatif, on peut être la veille
+                if (totalOffset <= -12) {
+                    localDay = getPreviousDay(singularDay);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Erreur calcul heure pour " + japanTime + ": " + e.getMessage());
+        }
+        
+        // Fuseau local
+        Map<String, String> countryTimezones = Map.of(
+            "FR", "CET",
+            "US", "EST", 
+            "GB", "GMT",
+            "DE", "CET",
+            "ES", "CET",
+            "IT", "CET"
+        );
+        
+        result.put("local_day", localDay);
+        result.put("local_time", localTime);
+        result.put("local_timezone", countryTimezones.getOrDefault(country, "CET"));
+        result.put("offset_hours", totalOffset);
+        
+        return result;
+    }
+    
+    /**
+     * Retourne le jour précédent
+     */
+    private String getPreviousDay(String day) {
+        Map<String, String> previousDay = Map.of(
+            "Monday", "Sunday",
+            "Tuesday", "Monday", 
+            "Wednesday", "Tuesday",
+            "Thursday", "Wednesday",
+            "Friday", "Thursday",
+            "Saturday", "Friday",
+            "Sunday", "Saturday"
+        );
+        return previousDay.getOrDefault(day, day);
     }
 }

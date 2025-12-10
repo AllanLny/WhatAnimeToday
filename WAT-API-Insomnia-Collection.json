@@ -1,0 +1,479 @@
+{
+	"_type": "export",
+	"__export_format": 4,
+	"__export_date": "2025-12-05T14:30:00.000Z",
+	"__export_source": "insomnia.desktop.app:v2023.5.8",
+	"resources": [
+		{
+			"_id": "req_01_today_releases_fr",
+			"parentId": "fld_anime_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/today",
+			"name": "📅 Today Releases - France",
+			"description": "Récupère les sorties d'animes du jour pour la France avec horaires localisés",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"id": "pair_country_fr",
+					"name": "country",
+					"value": "FR",
+					"description": "Code pays (FR, US, GB, etc.)"
+				}
+			],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701777000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_02_today_releases_us",
+			"parentId": "fld_anime_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/today",
+			"name": "📅 Today Releases - USA",
+			"description": "Récupère les sorties d'animes du jour pour les USA avec horaires localisés",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"id": "pair_country_us",
+					"name": "country",
+					"value": "US",
+					"description": "Code pays USA"
+				}
+			],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701776000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_03_today_all_countries",
+			"parentId": "fld_anime_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/today/all-countries",
+			"name": "🌍 Today Releases - All Countries",
+			"description": "Récupère les sorties agrégées de tous les pays",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701775000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_04_weekly_releases",
+			"parentId": "fld_anime_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/weekly",
+			"name": "📆 Weekly Releases",
+			"description": "Récupère les sorties de la semaine",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"id": "pair_country_weekly",
+					"name": "country",
+					"value": "FR",
+					"description": "Code pays"
+				}
+			],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701774000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_05_streaming_info",
+			"parentId": "fld_streaming_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/60378/streaming",
+			"name": "🎬 Streaming Info - One Piece",
+			"description": "Récupère les plateformes de streaming pour un anime",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"id": "pair_country_streaming",
+					"name": "country",
+					"value": "FR",
+					"description": "Code pays"
+				}
+			],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701773000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_06_streaming_tmdb",
+			"parentId": "fld_streaming_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/streaming/tmdb/37854",
+			"name": "🎭 Streaming by TMDB ID",
+			"description": "Récupère les plateformes via TMDB ID directement",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"id": "pair_country_tmdb",
+					"name": "country",
+					"value": "FR",
+					"description": "Code pays"
+				}
+			],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701772000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_07_resolve_tmdb",
+			"parentId": "fld_tmdb_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/resolve/tmdb",
+			"name": "🔍 Resolve TMDB ID",
+			"description": "Résout l'ID TMDB d'un anime par titre",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"id": "pair_title_resolve",
+					"name": "title",
+					"value": "One Piece",
+					"description": "Titre de l'anime"
+				},
+				{
+					"id": "pair_year_resolve",
+					"name": "year",
+					"value": "1999",
+					"description": "Année (optionnel)"
+				},
+				{
+					"id": "pair_country_resolve",
+					"name": "country",
+					"value": "FR",
+					"description": "Code pays"
+				}
+			],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701771000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_08_global_stats",
+			"parentId": "fld_stats_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/stats/global",
+			"name": "📊 Global Statistics",
+			"description": "Récupère les statistiques globales de l'application",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"id": "pair_country_stats",
+					"name": "country",
+					"value": "FR",
+					"description": "Code pays pour stats locales"
+				}
+			],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701770000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_09_cache_stats",
+			"parentId": "fld_cache_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/cache/stats",
+			"name": "🗄️ Cache Statistics",
+			"description": "Récupère les statistiques du cache",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701769000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_10_clear_cache",
+			"parentId": "fld_cache_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/cache/clear",
+			"name": "🗑️ Clear All Cache",
+			"description": "Vide tous les caches de l'application",
+			"method": "POST",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701768000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_11_diagnostics_sources",
+			"parentId": "fld_diagnostics_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/api/anime/diagnostics/today-sources",
+			"name": "🔧 Diagnostics - Today Sources",
+			"description": "Diagnostics des sources de données du jour",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701767000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "req_12_health_check",
+			"parentId": "fld_health_endpoints",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"url": "{{ _.base_url }}/health",
+			"name": "💚 Health Check",
+			"description": "Vérification de l'état de l'application",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"id": "pair_content_type",
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1701766000000,
+			"isPrivate": false,
+			"_type": "request"
+		},
+		{
+			"_id": "fld_anime_endpoints",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "📺 Anime Endpoints",
+			"description": "Endpoints pour récupérer les données d'animes",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1701777000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_streaming_endpoints",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "🎬 Streaming Endpoints",
+			"description": "Endpoints pour les plateformes de streaming",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1701776000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_tmdb_endpoints",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "🎭 TMDB Endpoints",
+			"description": "Endpoints pour les données TMDB",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1701775000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_stats_endpoints",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "📊 Statistics Endpoints",
+			"description": "Endpoints pour les statistiques",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1701774000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_cache_endpoints",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "🗄️ Cache Endpoints",
+			"description": "Endpoints pour la gestion du cache",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1701773000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_diagnostics_endpoints",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "🔧 Diagnostics Endpoints",
+			"description": "Endpoints pour les diagnostics",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1701772000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_health_endpoints",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "💚 Health Endpoints",
+			"description": "Endpoints de santé",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1701771000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "env_base",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "Base Environment",
+			"data": {
+				"base_url": "http://localhost:8080"
+			},
+			"dataPropertyOrder": {
+				"&": ["base_url"]
+			},
+			"color": null,
+			"isPrivate": false,
+			"metaSortKey": 1701777000000,
+			"_type": "environment"
+		},
+		{
+			"_id": "env_production",
+			"parentId": "wrk_wat_api",
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "Production Environment",
+			"data": {
+				"base_url": "https://wat-api.yourdomain.com"
+			},
+			"dataPropertyOrder": {
+				"&": ["base_url"]
+			},
+			"color": "#ff6b6b",
+			"isPrivate": false,
+			"metaSortKey": 1701777001000,
+			"_type": "environment"
+		},
+		{
+			"_id": "wrk_wat_api",
+			"parentId": null,
+			"modified": 1701777000000,
+			"created": 1701777000000,
+			"name": "WAT API - What Anime Today",
+			"description": "Collection complète des endpoints de l'API WAT pour tester les fonctionnalités d'animes, streaming et horaires de diffusion.\n\n🎯 **Fonctionnalités principales :**\n- Récupération des sorties d'animes du jour avec horaires localisés\n- Informations de streaming par pays\n- Statistiques et cache\n- Diagnostics de santé\n\n🌍 **Pays supportés :** FR, US, GB, DE, ES, IT, JP, BR, CA, AU\n\n⏰ **Nouvelles fonctionnalités :**\n- Horaires de diffusion adaptés selon le pays choisi\n- Calcul automatique du décalage horaire avec le Japon\n- Ajout de +1h pour le délai de traduction\n- Conversion automatique du pluriel (Fridays → Friday → Vendredi)",
+			"scope": "collection",
+			"_type": "workspace"
+		}
+	]
+}

@@ -194,6 +194,7 @@
           height: 16px;
           stroke-width: 2;
         }
+        }
         
         &.rating {
           color: vars.color('accent-yellow');
@@ -360,14 +361,127 @@
           
           // Styles spécifiques pour le bouton watchlist
           &.watchlist-btn {
-            &.active {
-              background: vars.color('primary');
-              border-color: vars.color('primary');
-              color: white;
-              box-shadow: 0 0 10px rgba(255, 59, 59, 0.4);
+            // Supprimer tous les contours et focus
+            outline: none !important;
+            border: 1px solid transparent;
+            box-shadow: none;
+            
+            &:focus,
+            &:focus-visible {
+              outline: none !important;
+              box-shadow: none !important;
+              border-color: transparent;
+            }
+            
+            &:active {
+              outline: none !important;
+              box-shadow: none !important;
+              transform: scale(0.95);
+            }
+            
+            // État normal (non ajouté à la watchlist)
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            
+            // Conteneur du cœur personnalisé
+            .heart-container {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 12px;
+              height: 12px;
               
-              svg {
-                color: white;
+              .heart-icon {
+                transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+                
+                .heart-stroke {
+                  color: rgba(255, 255, 255, 0.8);
+                  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                
+                .heart-fill {
+                  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                
+                .gradient-stop-start {
+                  transition: stop-opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                  stop-opacity: 0;
+                }
+                
+                .gradient-stop-end {
+                  transition: stop-opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+                  stop-opacity: 0;
+                }
+                
+                // État rempli (dans la watchlist)
+                &.filled {
+                  animation: heartBeat 0.6s ease-out;
+                  
+                  .heart-stroke {
+                    color: #ff3b3b;
+                    stroke-width: 2;
+                  }
+                  
+                  .gradient-stop-start {
+                    stop-opacity: 1;
+                  }
+                  
+                  .gradient-stop-end {
+                    stop-opacity: 1;
+                  }
+                }
+              }
+            }
+            
+            &:hover:not(.active) {
+              background: rgba(255, 255, 255, 0.2);
+              transform: scale(1.05);
+              
+              .heart-icon {
+                transform: scale(1.1);
+                filter: drop-shadow(0 2px 4px rgba(255, 59, 59, 0.3));
+                
+                .heart-stroke {
+                  color: vars.color('primary');
+                }
+              }
+            }
+            
+            // État actif (ajouté à la watchlist) - fond rouge
+            &.active {
+              background: rgba(255, 59, 59, 0.15);
+              border-color: rgba(255, 59, 59, 0.3);
+              animation: heartBeat 0.6s ease-out;
+              box-shadow: 
+                0 0 15px rgba(255, 59, 59, 0.4),
+                0 4px 8px rgba(0, 0, 0, 0.2);
+              
+              .heart-icon {
+                transform: scale(1.1);
+                filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+                
+                &.filled {
+                  animation: heartPulse 2s ease-in-out infinite;
+                }
+                
+                .heart-stroke {
+                  color: #ff3b3b;
+                  stroke-width: 2;
+                }
+              }
+              
+              &:hover {
+                background: rgba(255, 59, 59, 0.25);
+                transform: scale(1.05);
+                box-shadow: 
+                  0 0 20px rgba(255, 59, 59, 0.6),
+                  0 6px 12px rgba(0, 0, 0, 0.3);
+                  
+                .heart-icon {
+                  transform: scale(1.15);
+                }
               }
             }
             
@@ -375,6 +489,7 @@
               opacity: 0.6;
               cursor: not-allowed;
               animation: pulse 1.5s infinite;
+              pointer-events: none;
               
               .loading-spinner {
                 font-size: 12px;
@@ -384,6 +499,7 @@
             &:disabled {
               cursor: not-allowed;
               opacity: 0.6;
+              pointer-events: none;
             }
           }
         }
@@ -392,10 +508,49 @@
           0%, 100% { opacity: 0.6; }
           50% { opacity: 1; }
         }
+        
+        @keyframes heartBeat {
+          0% { transform: scale(1); }
+          15% { transform: scale(1.2); }
+          30% { transform: scale(1.05); }
+          45% { transform: scale(1.15); }
+          60% { transform: scale(1.05); }
+          100% { transform: scale(1.1); }
+        }
+        
+        @keyframes heartPulse {
+          0%, 100% { 
+            transform: scale(1.1); 
+            filter: drop-shadow(0 2px 6px rgba(255, 59, 59, 0.4));
+          }
+          50% { 
+            transform: scale(1.2); 
+            filter: drop-shadow(0 4px 8px rgba(255, 59, 59, 0.6));
+          }
+        }
+        
+        @keyframes heartFill {
+          0% { 
+            opacity: 0.3;
+            transform: scale(0.8) translateY(10px);
+          }
+          30% {
+            opacity: 0.6;
+            transform: scale(1.1) translateY(-2px);
+          }
+          60% {
+            opacity: 0.9;
+            transform: scale(1.05) translateY(1px);
+          }
+          100% { 
+            opacity: 1;
+            transform: scale(1.1) translateY(0px);
+          }
+        }
       }
     }
   }
-}
+
 
 // Compact variant
 .anime-card.compact {

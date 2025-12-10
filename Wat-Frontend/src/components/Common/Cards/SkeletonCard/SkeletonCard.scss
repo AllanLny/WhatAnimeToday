@@ -1,0 +1,200 @@
+@use '../../../../variables.scss' as vars;
+@use 'sass:map';
+
+.skeleton-card {
+  position: relative;
+  background: vars.$color-bg-card;
+  border-radius: vars.$border-radius-md;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #{map.get(vars.$colors, 'border-light')};
+  
+  // Animation de shimmer
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.03) 50%,
+      transparent 100%
+    );
+    animation: shimmer 2s infinite;
+    z-index: 1;
+  }
+  
+  .skeleton-image {
+    width: 100%;
+    height: 300px;
+    background: linear-gradient(
+      135deg,
+      vars.$color-bg-hover 0%,
+      vars.$color-bg-dark 50%,
+      vars.$color-bg-hover 100%
+    );
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease-in-out infinite;
+  }
+  
+  .skeleton-content {
+    padding: vars.$spacing-md;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-sm;
+  }
+  
+  .skeleton-line {
+    height: 12px;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    background-size: 200% 100%;
+    border-radius: 6px;
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+    
+    &.skeleton-title {
+      height: 16px;
+      margin-bottom: vars.$spacing-xs;
+    }
+    
+    &.skeleton-subtitle {
+      height: 14px;
+      opacity: 0.7;
+    }
+  }
+  
+  .skeleton-meta {
+    display: flex;
+    gap: vars.$spacing-sm;
+    margin: vars.$spacing-xs 0;
+    
+    .skeleton-score,
+    .skeleton-year {
+      height: 10px;
+      border-radius: 4px;
+    }
+  }
+  
+  .skeleton-synopsis {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-xs / 2;
+    margin: vars.$spacing-sm 0;
+    
+    .skeleton-line {
+      height: 10px;
+    }
+  }
+  
+  .skeleton-platforms {
+    display: flex;
+    gap: vars.$spacing-xs;
+    margin-top: auto;
+    padding-top: vars.$spacing-sm;
+    
+    .skeleton-platform-item {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.03) 0%,
+        rgba(255, 255, 255, 0.08) 100%
+      );
+      animation: skeletonPulse 1.5s ease-in-out infinite;
+      
+      &:nth-child(2) { animation-delay: 0.2s; }
+      &:nth-child(3) { animation-delay: 0.4s; }
+    }
+  }
+  
+  .skeleton-watchlist-btn {
+    position: absolute;
+    top: vars.$spacing-sm;
+    right: vars.$spacing-sm;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    animation: skeletonPulse 1.5s ease-in-out infinite 0.5s;
+  }
+  
+  // Variant liste
+  &.list {
+    flex-direction: row;
+    height: 120px;
+    
+    .skeleton-image {
+      width: 80px;
+      height: 100%;
+      flex-shrink: 0;
+    }
+    
+    .skeleton-content {
+      padding: vars.$spacing-sm;
+    }
+    
+    .skeleton-synopsis,
+    .skeleton-platforms,
+    .skeleton-meta {
+      display: none;
+    }
+  }
+}
+
+// Animations
+@keyframes skeletonPulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes fadeInSkeleton {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}

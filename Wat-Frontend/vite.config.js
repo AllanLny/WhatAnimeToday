@@ -6,8 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     // expose dev server on LAN so other devices can access via network URL
-    host: true,
+    host: '0.0.0.0', // Écouter sur toutes les interfaces réseau
     port: 5173,
+    strictPort: true, // Échouer si le port n'est pas disponible
     // Proxy API calls to the local backend so network clients don't call their own localhost
     proxy: {
       '/api': {
@@ -18,5 +19,13 @@ export default defineConfig({
         rewrite: (path) => path
       }
     }
+  },
+  // Améliorer la configuration pour le développement en réseau
+  define: {
+    __DEV__: true
+  },
+  // Optimisations pour le développement réseau
+  optimizeDeps: {
+    include: ['react', 'react-dom']
   }
 })
